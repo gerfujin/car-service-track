@@ -53,4 +53,8 @@
       <_ContentIncludedByDefault Remove="Views\Persons\Index.cshtml" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Folder Include="wwwroot\uploads\" />
+    </ItemGroup>
+
 </Project>
