@@ -44,6 +44,8 @@ services:
     environment:
       - PGADMIN_DEFAULT_EMAIL=akaver@akaver.com
       - PGADMIN_DEFAULT_PASSWORD=Foo.bar1
+      - PGADMIN_CONFIG_WTF_CSRF_ENABLED=False
+      - PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION=False
     ports:
       - "88:80"
     volumes:
