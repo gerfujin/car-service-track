@@ -13,8 +13,8 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: "Production"
       ConnectionStrings__DefaultConnection: "Server=postgres;Port=5432;Database=dockerdemo;Username=postgres;Password=postgres"
-    volumes:
-      - aspnet-uploads:/app/WebApp/wwwroot/uploads
+    #volumes:
+    #  - aspnet-uploads:/app/WebApp/wwwroot/uploads
       
   postgres:
     container_name: "postgres"
