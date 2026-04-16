@@ -15,7 +15,26 @@ services:
       ConnectionStrings__DefaultConnection: "Server=postgres;Port=5432;Database=dockerdemo;Username=postgres;Password=postgres"
     #volumes:
     #  - aspnet-uploads:/app/WebApp/wwwroot/uploads
-      
+
+  vue-client:
+    build:
+      context: ./client-app
+      dockerfile: Dockerfile
+      args:
+        # VITE_API_BASE_URL is intentionally empty in Docker:
+        # nginx (nginx.conf) proxies /api/* requests to the aspnet container,
+        # so the Vue app uses same-origin API calls (no cross-origin issues).
+        VITE_API_BASE_URL: ""
+    container_name: vue-client
+    ports:
+      - "3000:80"
+    depends_on:
+      - aspnet
+    logging:
+      options:
+        max-size: 10m
+        max-file: "3"
+
   postgres:
     container_name: "postgres"
     pull_policy: always

@@ -56,4 +56,24 @@ public static class IdentityHelpers
             return false;
         }
     }
+
+    /// <summary>
+    /// Extract the user ID (Guid) from the ClaimsPrincipal.
+    /// Returns null if not found or not parseable.
+    /// </summary>
+    public static Guid? GetUserId(ClaimsPrincipal user)
+    {
+        var userIdStr = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userIdStr == null) return null;
+        if (Guid.TryParse(userIdStr, out var userId)) return userId;
+        return null;
+    }
+
+    /// <summary>
+    /// Extract the user email from the ClaimsPrincipal.
+    /// </summary>
+    public static string? GetUserEmail(ClaimsPrincipal user)
+    {
+        return user.FindFirst(ClaimTypes.Email)?.Value;
+    }
 }

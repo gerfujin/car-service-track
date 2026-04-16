@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:element name="root" msdata:IsDataSet="true">
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="MyVehicles" xml:space="preserve">
+    <value>Minu sõidukid</value>
+  </data>
+  <data name="MyOrders" xml:space="preserve">
+    <value>Minu teenindusorderid</value>
+  </data>
+  <data name="Payments" xml:space="preserve">
+    <value>Maksed</value>
+  </data>
+  <data name="AddVehicle" xml:space="preserve">
+    <value>Lisa sõiduk</value>
+  </data>
+  <data name="CreateOrder" xml:space="preserve">
+    <value>Loo teenindusorder</value>
+  </data>
+  <data name="Status" xml:space="preserve">
+    <value>Staatus</value>
+  </data>
+  <data name="Workshop" xml:space="preserve">
+    <value>Töökoda</value>
+  </data>
+  <data name="Mechanic" xml:space="preserve">
+    <value>Mehhaanik</value>
+  </data>
+  <data name="LicensePlate" xml:space="preserve">
+    <value>Registreerimisnumber</value>
+  </data>
+  <data name="Mileage" xml:space="preserve">
+    <value>Läbisõit</value>
+  </data>
+  <data name="OrderDate" xml:space="preserve">
+    <value>Tellimuse kuupäev</value>
+  </data>
+  <data name="TotalAmount" xml:space="preserve">
+    <value>Kogusumma</value>
+  </data>
+  <data name="PaymentStatus" xml:space="preserve">
+    <value>Makse staatus</value>
+  </data>
+  <data name="StatusHistory" xml:space="preserve">
+    <value>Staatuse ajalugu</value>
+  </data>
+  <data name="RepairPhotos" xml:space="preserve">
+    <value>Remondi fotod</value>
+  </data>
+  <data name="NoPhotosYet" xml:space="preserve">
+    <value>Fotosid pole veel — Tulemas peagi</value>
+  </data>
+</root>

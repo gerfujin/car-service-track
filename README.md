@@ -1,100 +1,212 @@
-## Useful commands in .net console CLI
+# CarServiceTrack — Full-Stack University Submission
 
-Install tooling
+A full-stack car service management application built with:
+- **Backend**: ASP.NET Core 8 Web API + MVC Admin Area
+- **Frontend**: Vue 3 + TypeScript + Vite SPA (`client-app/`)
+- **Database**: PostgreSQL (via Docker) or SQLite (local dev)
+- **Auth**: JWT + Refresh Tokens
 
-~~~bash
+---
+
+## Solution Structure
+
+This project is organized as **one unified full-stack solution** rooted at the repository root.
+Open `HWDemo.sln` in JetBrains Rider (or Visual Studio) to see both the backend and frontend together.
+
+```
+project-root/
+├── HWDemo.sln               ← Open this in Rider — shows backend + frontend together
+│
+├── ── Backend (.NET projects, visible in solution tree) ──
+├── WebApp/                  # ASP.NET Core backend (API + MVC Admin)
+├── App.Domain/              # Domain entities
+├── App.DAL.EF/              # EF Core DbContext + Migrations
+├── App.DTO/                 # Data Transfer Objects (API contracts)
+├── App.Resources/           # Localization resources (en/et)
+├── Base.Contracts/          # Shared interfaces
+├── Base.Domain/             # Base entity classes
+├── Base.Helpers/            # JWT / Identity helpers
+│
+├── ── Frontend (Vue 3 SPA, visible as "Frontend" solution folder) ──
+├── client-app/              # Vue 3 SPA frontend
+│   ├── src/
+│   │   ├── components/      # Shared UI components (NavBar, etc.)
+│   │   ├── i18n/            # Translations (en / et)
+│   │   ├── router/          # Vue Router routes
+│   │   ├── services/        # Axios API service layer
+│   │   ├── stores/          # Pinia state stores
+│   │   ├── types/           # TypeScript type definitions
+│   │   └── views/           # Page components
+│   ├── .env                 # Dev environment (API base URL)
+│   ├── .env.production      # Production environment
+│   ├── Dockerfile           # Vue app Docker build
+│   ├── nginx.conf           # Nginx config (SPA + API proxy)
+│   ├── package.json
+│   └── vite.config.ts
+│
+├── ── Infrastructure ──
+├── docker-compose.yml       # Full-stack Docker Compose (backend + frontend + DB)
+├── Dockerfile               # ASP.NET Core Docker build
+├── Directory.Build.Props    # Shared MSBuild properties
+└── README.md
+```
+
+### How the solution is organized in Rider
+
+When you open `HWDemo.sln` in Rider, the **Solution Explorer** shows:
+
+| Solution Folder | Contents |
+|-----------------|----------|
+| `App`           | WebApp, App.Domain, App.DAL.EF, App.DTO, App.Resources |
+| `Base`          | Base.Domain, Base.Contracts, Base.Helpers |
+| `Frontend`      | All `client-app/` source files (Vue, TypeScript, config) — visible as solution items |
+| `!Solution Items` | README.md, .gitignore, Directory.Build.Props |
+| `!CICD`         | docker-compose.yml, Dockerfile, .gitlab-ci.yml, .dockerignore |
+
+> **Note:** The `Frontend` folder is a **Solution Folder** (not a .NET project). It contains the Vue/Vite
+> source files as solution items so they are browsable and editable directly from the Rider solution tree.
+> The Vue app remains a fully independent Node.js/Vite project — it is not converted to a .NET project.
+
+---
+
+## Opening the Project in Rider
+
+1. **Open `HWDemo.sln`** from the project root in JetBrains Rider.
+2. In the **Solution Explorer**, expand the `Frontend` folder to browse all Vue/TypeScript source files.
+3. You can edit `.vue`, `.ts`, and config files directly from Rider's solution tree.
+4. To run the Vue dev server, open a terminal in Rider and run `cd client-app && npm run dev`.
+5. To run the backend, use the standard Rider run configuration for `WebApp`.
+
+---
+
+## Running Locally (Development)
+
+### 1. Backend — ASP.NET Core
+
+Requirements: .NET 8 SDK
+
+```bash
+# From project root — apply migrations and seed data
+dotnet ef database --project App.DAL.EF --startup-project WebApp update
+
+# Run the backend (listens on http://localhost:5065)
+dotnet run --project WebApp
+```
+
+The backend exposes:
+- REST API: `http://localhost:5065/api/v1/`
+- Swagger UI: `http://localhost:5065/swagger`
+- Admin MVC area: `http://localhost:5065/Admin`
+
+### 2. Frontend — Vue 3 SPA
+
+Requirements: Node.js 18+
+
+```bash
+cd client-app
+
+# Install dependencies
+npm install
+
+# Start dev server with hot-reload (proxies /api to localhost:5065)
+npm run dev
+```
+
+The Vue app runs at `http://localhost:5173` and proxies all `/api/*` requests to the ASP.NET backend at `http://localhost:5065` (configured in `vite.config.ts`).
+
+---
+
+## Running with Docker Compose (Production-like)
+
+Requirements: Docker + Docker Compose
+
+```bash
+# Build and start all services (backend, frontend, PostgreSQL, pgAdmin)
+docker compose up --build
+```
+
+| Service    | URL                          | Description                  |
+|------------|------------------------------|------------------------------|
+| Vue SPA    | http://localhost:3000        | Vue frontend (nginx)         |
+| ASP.NET    | http://localhost:8080        | Backend API + Admin          |
+| pgAdmin    | http://localhost:88          | PostgreSQL admin UI          |
+
+**How the Docker networking works:**
+- The Vue app is served by nginx on port 3000.
+- nginx proxies all `/api/*` requests to the `aspnet` container on port 8080 (internal Docker network).
+- The browser only ever talks to `localhost:3000` — no CORS issues.
+
+---
+
+## Environment Variables
+
+### `client-app/.env` (development)
+```
+VITE_API_BASE_URL=http://localhost:5065
+```
+
+### `client-app/.env.production` (Docker / production)
+```
+VITE_API_BASE_URL=
+```
+Empty string means same-origin — nginx handles the proxy to the backend.
+
+---
+
+## EF Core Migrations
+
+Run from the solution root:
+
+```bash
 dotnet tool update -g dotnet-ef
-dotnet tool update -g dotnet-aspnet-codegenerator 
-~~~
 
-## EF Core migrations
+# Add a new migration
+dotnet ef migrations --project App.DAL.EF --startup-project WebApp add <MigrationName>
 
-Run from solution folder
-
-~~~bash
-dotnet ef migrations --project App.DAL.EF --startup-project WebApp add FOOBAR
+# Remove last migration
 dotnet ef migrations --project App.DAL.EF --startup-project WebApp remove
 
-dotnet ef database   --project App.DAL.EF --startup-project WebApp update
-dotnet ef database   --project App.DAL.EF --startup-project WebApp drop
-~~~
+# Apply migrations
+dotnet ef database --project App.DAL.EF --startup-project WebApp update
 
+# Drop database
+dotnet ef database --project App.DAL.EF --startup-project WebApp drop
+```
 
-## MVC controllers
+---
 
-Install from nuget:
-- Microsoft.VisualStudio.Web.CodeGeneration.Design
-- Microsoft.EntityFrameworkCore.SqlServer
+## Docker Image Build (manual)
 
+```bash
+# Build and push ASP.NET backend image
+docker buildx build --progress=plain --force-rm --push -t <your-registry>/webapp:latest .
 
-Run from WebApp folder!
-
-~~~bash
-cd WebApp
-
-dotnet aspnet-codegenerator controller -name ListItemsController        -actions -m  App.Domain.ListItem        -dc AppDbContext -outDir Controllers --useDefaultLayout --useAsyncActions --referenceScriptLibraries -f
-
-# use area
-
-dotnet aspnet-codegenerator controller -name RefreshTokensController        -actions -m  App.Domain.Identity.AppRefreshToken        -dc AppDbContext -outDir Areas/Admin/Controllers --useDefaultLayout --useAsyncActions --referenceScriptLibraries -f
-
-~~~
-
-Api controllers
-~~~bash
-dotnet aspnet-codegenerator controller -name ListItemsController  -m  App.Domain.ListItem        -dc AppDbContext -outDir ApiControllers -api --useAsyncActions -f
-~~~
-
-
-## Docker
-
-~~~bash
-docker buildx build --progress=plain --force-rm --push -t akaver/webapp:latest . 
-
-# multiplatform build on apple silicon
-# https://docs.docker.com/build/building/multi-platform/
+# Multi-platform build (e.g. Apple Silicon)
 docker buildx create --name mybuilder --bootstrap --use
-docker buildx build --platform linux/amd64 -t akaver/webapp:latest --push .
-~~~
+docker buildx build --platform linux/amd64 -t <your-registry>/webapp:latest --push .
+```
 
+---
 
-## Prompt engineering for Cursor
-Context: Article.cs, Organization.cs, AppDbContext.cs
-~~~xml
-<purpose>
-   Article must be categorized
-</purpose>
+## Default Admin Credentials (seeded)
 
-<instructions>
-   <instruction>Generate new model class in App.Domain project. named ArticleCategroy</instruction>
-   <instruction>Add optional 1:m relationship between Article and ArticleCategroy</instruction>
-   <instruction>Category is owned by Organization</instruction>
-   <instruction>Use LangStr for CategoryDisplayName</instruction>
-   <instruction>Use string for CategoryName, limited to 64 characters</instruction>
-   <instruction>ArticleCategory must also have optional collection navigation property to Article</instruction>
-   <instruction>Do not modify entity relationship rules in OnModelCreating</instruction>
-</instructions>
-~~~
+| Role  | Email                  | Password   |
+|-------|------------------------|------------|
+| Admin | admin@carservice.com   | Admin123!  |
+| User  | user@carservice.com    | User123!   |
 
-Optimize generated controller - use viewmodels
+*(Seeded by `App.DAL.EF/Seeding/AppDataInit.cs` on first run)*
 
-Context: ArticleCategoryController.cs, Organization.cs
-~~~xml
-<purpose>
-   Optimize  controller and associated views - use viewmodels and nameof. Entity is in ArticleCategory.cs
-</purpose>
+---
 
-<instructions>
-   <instruction>Controllers, Views and Viemodels folders and files are located in Admin area - WebApp/Areas/Admin</instruction>
-   <instruction>Generate and use viewmodel for entity</instruction>
-   <instruction>Do not copy properties over from entity - use it directly inside viewmodel</instruction>
-   <instruction>Avoid using ViewBag and ViewData</instruction>
-   <instruction>Use nameof function in selectlist creation</instruction>
-   <instruction>Extract selectlist creation to separate method, order data by selectlist value field. Support also to set specific selected value - needed in Edit methods</instruction>
-   <instruction>Selectlist creation methods should have default value as null for selected value. Example: (Guid? selectedValue = null)</instruction>
-   <instruction>Use async methods with await as needed</instruction>
-   <instruction>Update views to use the viewmodel</instruction>
-   <instruction>In viewmodels use [ValidateNever] attribute for selectlists</instruction>
-</instructions>
-~~~
+## Tech Stack
 
+| Layer      | Technology                              |
+|------------|-----------------------------------------|
+| Backend    | ASP.NET Core 8, EF Core, PostgreSQL     |
+| Auth       | ASP.NET Identity, JWT, Refresh Tokens   |
+| API Docs   | Swagger / OpenAPI (Swashbuckle)         |
+| Frontend   | Vue 3, TypeScript, Vite, Pinia, Axios   |
+| i18n       | vue-i18n (English + Estonian)           |
+| Routing    | Vue Router 4                            |
+| Container  | Docker, Docker Compose, nginx           |

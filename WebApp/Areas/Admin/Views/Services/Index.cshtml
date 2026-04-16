@@ -1,0 +1,45 @@
+@model WebApp.Areas.Admin.ViewModels.ServiceAdminListViewModel
+@{
+    ViewData["Title"] = "Services";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>🔩 Services</h2>
+    <a asp-action="Create" class="btn btn-primary">+ Add Service</a>
+</div>
+
+@if (!Model.Services.Any())
+{
+    <div class="alert alert-info">No services found. <a asp-action="Create">Add the first service.</a></div>
+}
+else
+{
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Service Name</th>
+                        <th>Description</th>
+                        <th>Base Price</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var s in Model.Services)
+                    {
+                        <tr>
+                            <td><strong>@s.Name</strong></td>
+                            <td class="text-muted">@(s.Description.Length > 60 ? s.Description[..60] + "…" : s.Description)</td>
+                            <td>€@s.BasePrice.ToString("F2")</td>
+                            <td class="text-end">
+                                <a asp-action="Edit" asp-route-id="@s.Id" class="btn btn-sm btn-outline-primary">Edit</a>
+                                <a asp-action="Delete" asp-route-id="@s.Id" class="btn btn-sm btn-outline-danger">Delete</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}

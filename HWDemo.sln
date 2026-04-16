@@ -35,6 +35,46 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "!CICD", "!CICD", "{14321733
 		Dockerfile = Dockerfile
 	EndProjectSection
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Frontend", "Frontend", "{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
+	ProjectSection(SolutionItems) = preProject
+		client-app\package.json = client-app\package.json
+		client-app\vite.config.ts = client-app\vite.config.ts
+		client-app\tsconfig.json = client-app\tsconfig.json
+		client-app\index.html = client-app\index.html
+		client-app\.env = client-app\.env
+		client-app\.env.production = client-app\.env.production
+		client-app\Dockerfile = client-app\Dockerfile
+		client-app\nginx.conf = client-app\nginx.conf
+		client-app\src\main.ts = client-app\src\main.ts
+		client-app\src\App.vue = client-app\src\App.vue
+		client-app\src\types\index.ts = client-app\src\types\index.ts
+		client-app\src\router\index.ts = client-app\src\router\index.ts
+		client-app\src\stores\auth.ts = client-app\src\stores\auth.ts
+		client-app\src\services\api.ts = client-app\src\services\api.ts
+		client-app\src\services\authService.ts = client-app\src\services\authService.ts
+		client-app\src\services\vehicleService.ts = client-app\src\services\vehicleService.ts
+		client-app\src\services\orderService.ts = client-app\src\services\orderService.ts
+		client-app\src\services\paymentService.ts = client-app\src\services\paymentService.ts
+		client-app\src\services\workshopService.ts = client-app\src\services\workshopService.ts
+		client-app\src\components\NavBar.vue = client-app\src\components\NavBar.vue
+		client-app\src\i18n\en.ts = client-app\src\i18n\en.ts
+		client-app\src\i18n\et.ts = client-app\src\i18n\et.ts
+		client-app\src\i18n\index.ts = client-app\src\i18n\index.ts
+		client-app\src\views\HomeView.vue = client-app\src\views\HomeView.vue
+		client-app\src\views\LoginView.vue = client-app\src\views\LoginView.vue
+		client-app\src\views\RegisterView.vue = client-app\src\views\RegisterView.vue
+		client-app\src\views\vehicles\VehiclesView.vue = client-app\src\views\vehicles\VehiclesView.vue
+		client-app\src\views\vehicles\VehicleCreateView.vue = client-app\src\views\vehicles\VehicleCreateView.vue
+		client-app\src\views\vehicles\VehicleDetailView.vue = client-app\src\views\vehicles\VehicleDetailView.vue
+		client-app\src\views\vehicles\VehicleEditView.vue = client-app\src\views\vehicles\VehicleEditView.vue
+		client-app\src\views\orders\OrdersView.vue = client-app\src\views\orders\OrdersView.vue
+		client-app\src\views\orders\OrderCreateView.vue = client-app\src\views\orders\OrderCreateView.vue
+		client-app\src\views\orders\OrderDetailView.vue = client-app\src\views\orders\OrderDetailView.vue
+		client-app\src\views\orders\OrderProgressView.vue = client-app\src\views\orders\OrderProgressView.vue
+		client-app\src\views\payments\PaymentsView.vue = client-app\src\views\payments\PaymentsView.vue
+		client-app\src\views\payments\PaymentDetailView.vue = client-app\src\views\payments\PaymentDetailView.vue
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU

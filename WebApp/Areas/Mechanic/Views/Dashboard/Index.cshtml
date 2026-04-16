@@ -1,0 +1,113 @@
+@model WebApp.Areas.Mechanic.ViewModels.MechanicDashboardViewModel
+@{
+    ViewData["Title"] = "Mechanic Dashboard";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>📊 Mechanic Dashboard</h2>
+    <span class="badge bg-info fs-6">👨‍🔧 Mechanic</span>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card shadow-sm border-start border-primary border-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <div class="text-muted small">Total Orders</div>
+                        <div class="fs-3 fw-bold">@Model.TotalOrders</div>
+                    </div>
+                    <div class="fs-1 text-primary opacity-50">📋</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card shadow-sm border-start border-warning border-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <div class="text-muted small">Pending</div>
+                        <div class="fs-3 fw-bold text-warning">@Model.PendingOrders</div>
+                    </div>
+                    <div class="fs-1 text-warning opacity-50">⏳</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card shadow-sm border-start border-info border-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <div class="text-muted small">In Progress</div>
+                        <div class="fs-3 fw-bold text-info">@Model.InProgressOrders</div>
+                    </div>
+                    <div class="fs-1 text-info opacity-50">🔧</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card shadow-sm border-start border-success border-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <div class="text-muted small">Completed</div>
+                        <div class="fs-3 fw-bold text-success">@Model.CompletedOrders</div>
+                    </div>
+                    <div class="fs-1 text-success opacity-50">✅</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card shadow-sm border-start border-secondary border-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <div class="text-muted small">Total Vehicles</div>
+                        <div class="fs-3 fw-bold">@Model.TotalVehicles</div>
+                    </div>
+                    <div class="fs-1 text-secondary opacity-50">🚗</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card shadow-sm border-start border-dark border-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <div class="text-muted small">Total Payments</div>
+                        <div class="fs-3 fw-bold">@Model.TotalPayments</div>
+                    </div>
+                    <div class="fs-1 text-dark opacity-50">💰</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-body text-center">
+                <div class="fs-1 mb-2">📋</div>
+                <h5>Service Orders</h5>
+                <p class="text-muted">View all orders and update their status</p>
+                <a asp-area="Mechanic" asp-controller="Orders" asp-action="Index" class="btn btn-primary">View Orders</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-body text-center">
+                <div class="fs-1 mb-2">🚗</div>
+                <h5>Vehicles</h5>
+                <p class="text-muted">Browse all vehicles (read-only)</p>
+                <a asp-area="" asp-controller="Vehicles" asp-action="Index" class="btn btn-outline-secondary">View Vehicles</a>
+            </div>
+        </div>
+    </div>
+</div>

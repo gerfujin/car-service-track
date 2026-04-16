@@ -1,0 +1,61 @@
+@model WebApp.ViewModels.Client.VehicleListClientViewModel
+@{
+    ViewData["Title"] = "My Vehicles";
+    var isReadOnly = ViewBag.IsReadOnly == true;
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>🚗 @(isReadOnly ? "All Vehicles" : "My Vehicles")</h2>
+    @if (!isReadOnly && (User.IsInRole("admin") || User.IsInRole("client")))
+    {
+        <a asp-action="Create" class="btn btn-primary">+ Add Vehicle</a>
+    }
+</div>
+
+@if (!Model.Vehicles.Any())
+{
+    <div class="text-center py-5">
+        <div class="fs-1 mb-3">🚗</div>
+        <h4 class="text-muted">No vehicles yet</h4>
+        @if (!isReadOnly)
+        {
+            <p class="text-muted">Add your first vehicle to start tracking service history.</p>
+            <a asp-action="Create" class="btn btn-primary">Add Vehicle</a>
+        }
+    </div>
+}
+else
+{
+    <div class="row g-3">
+        @foreach (var v in Model.Vehicles)
+        {
+            <div class="col-md-4">
+                <div class="card shadow-sm h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">@v.Year @v.Make @v.Model</h5>
+                        <p class="card-text">
+                            <span class="badge bg-secondary">@v.LicensePlate</span>
+                            @if (v.Color != null)
+                            {
+                                <span class="badge bg-light text-dark ms-1">@v.Color</span>
+                            }
+                        </p>
+                        @if (v.Mileage.HasValue)
+                        {
+                            <p class="text-muted small">Mileage: @v.Mileage.Value.ToString("N0") km</p>
+                        }
+                        <p class="text-muted small">@v.ServiceOrderCount service order(s)</p>
+                    </div>
+                    <div class="card-footer bg-transparent d-flex gap-1 flex-wrap">
+                        <a asp-action="Details" asp-route-id="@v.Id" class="btn btn-sm btn-outline-primary">Details</a>
+                        @if (!isReadOnly)
+                        {
+                            <a asp-action="Edit" asp-route-id="@v.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
+                            <a asp-action="Delete" asp-route-id="@v.Id" class="btn btn-sm btn-outline-danger ms-auto">Delete</a>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}

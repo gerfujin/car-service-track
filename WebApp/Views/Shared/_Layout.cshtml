@@ -1,67 +1,82 @@
-﻿@using App.Domain.Identity
-@using Microsoft.AspNetCore.Identity
-@inject SignInManager<AppUser> _signInManager
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="utf-8"/>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>@ViewData["Title"] - WebApp</title>
-    <script type="importmap"></script>
-    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css"/>
-    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true"/>
-    <link rel="stylesheet" href="~/WebApp.styles.css" asp-append-version="true"/>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - CarServiceTrack</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
 <body>
 <header>
-    <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
+    <nav class="navbar navbar-expand-sm navbar-dark bg-dark border-bottom border-secondary">
         <div class="container">
-            <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">WebApp</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse"
-                    aria-controls="navbarSupportedContent"
-                    aria-expanded="false" aria-label="Toggle navigation">
+            <a class="navbar-brand fw-bold" asp-area="" asp-controller="Home" asp-action="Index">
+                🔧 CarServiceTrack
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
-            <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
-                <ul class="navbar-nav flex-grow-1">
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
+                        <a class="nav-link" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
                     </li>
-                    @if (_signInManager.IsSignedIn(User))
+                    @if (User.Identity?.IsAuthenticated == true)
                     {
-                        <li class="nav-item dropdown">
-                            <a class="nav-link text-dark dropdown-toggle" href="#" id="navbarDropdown1" role="button"
-                               data-bs-toggle="dropdown" aria-expanded="false">
-                                @App.Resources.Views.Home.User
-                            </a>
-                            <div class="dropdown-menu" aria-labelledby="navbarDropdown1">
-                                    <a class="nav-link text-dark" asp-area="" asp-controller="ListItems" asp-action="Index">ListItems</a>
-                            </div>
+                        @* Vehicles: all roles see it *@
+                        <li class="nav-item">
+                            <a class="nav-link" asp-area="" asp-controller="Vehicles" asp-action="Index">🚗 Vehicles</a>
                         </li>
+                        @* Orders: all roles see it *@
+                        <li class="nav-item">
+                            <a class="nav-link" asp-area="" asp-controller="ServiceOrders" asp-action="Index">📋 Orders</a>
+                        </li>
+                        @* Payments: all roles see it *@
+                        <li class="nav-item">
+                            <a class="nav-link" asp-area="" asp-controller="Payments" asp-action="Index">💰 Payments</a>
+                        </li>
+                        @* Mechanic panel: mechanic only *@
+                        @if (User.IsInRole("mechanic"))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-info" asp-area="Mechanic" asp-controller="Dashboard" asp-action="Index">👨‍🔧 Mechanic Panel</a>
+                            </li>
+                        }
+                        @* Admin panel: admin only *@
+                        @if (User.IsInRole("admin"))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-warning" asp-area="Admin" asp-controller="Dashboard" asp-action="Index">⚙️ Admin</a>
+                            </li>
+                        }
                     }
-                    <li class="nav-item">
-                        <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
-                    </li>
-                    
-                    <partial name="_LanguageSelection"/>
                 </ul>
-                <partial name="_LoginPartial"/>
+                <ul class="navbar-nav">
+                    <partial name="_LoginPartial" />
+                </ul>
+                <partial name="_LanguageSelection" />
             </div>
         </div>
     </nav>
 </header>
-<div class="container">
-    <main role="main" class="pb-3">
+
+<div class="container py-4">
+    <main role="main">
         @RenderBody()
     </main>
 </div>
 
-<footer class="border-top footer text-muted">
-    <div class="container">
-        &copy; 2026 - WebApp - <a asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a> 
-        | @Thread.CurrentThread.CurrentUICulture.Name
+<footer class="border-top footer text-muted bg-light py-3">
+    <div class="container text-center">
+        <small>&copy; @DateTime.Now.Year CarServiceTrack — Car Service Transparency System</small>
+        <span class="mx-2">|</span>
+        <small><a asp-area="" asp-controller="Home" asp-action="Privacy" class="text-muted">Privacy</a></small>
+        <span class="mx-2">|</span>
+        <small><a href="/swagger" class="text-muted">API Docs</a></small>
     </div>
 </footer>
+
 <script src="~/lib/jquery/dist/jquery.min.js"></script>
 <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
 <script src="~/js/site.js" asp-append-version="true"></script>

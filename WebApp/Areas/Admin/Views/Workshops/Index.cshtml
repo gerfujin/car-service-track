@@ -1,0 +1,44 @@
+@model WebApp.Areas.Admin.ViewModels.WorkshopListViewModel
+@{
+    ViewData["Title"] = "Workshops";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>🏭 Workshops</h2>
+    <a asp-action="Create" class="btn btn-primary">+ Add Workshop</a>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead class="table-dark">
+                <tr>
+                    <th>Name</th>
+                    <th>Address</th>
+                    <th>Phone</th>
+                    <th>Email</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var w in Model.Workshops)
+                {
+                    <tr>
+                        <td>@w.Name</td>
+                        <td>@w.Address</td>
+                        <td>@(w.Phone ?? "-")</td>
+                        <td>@(w.Email ?? "-")</td>
+                        <td>
+                            <a asp-action="Edit" asp-route-id="@w.Id" class="btn btn-sm btn-outline-primary">Edit</a>
+                            <a asp-action="Delete" asp-route-id="@w.Id" class="btn btn-sm btn-outline-danger">Delete</a>
+                        </td>
+                    </tr>
+                }
+                @if (!Model.Workshops.Any())
+                {
+                    <tr><td colspan="5" class="text-center text-muted py-4">No workshops found.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

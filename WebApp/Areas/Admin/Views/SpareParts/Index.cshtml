@@ -1,0 +1,60 @@
+@model WebApp.Areas.Admin.ViewModels.SparePartAdminListViewModel
+@{
+    ViewData["Title"] = "Spare Parts";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>🔧 Spare Parts</h2>
+    <a asp-action="Create" class="btn btn-primary">+ Add Spare Part</a>
+</div>
+
+@if (!Model.SpareParts.Any())
+{
+    <div class="alert alert-info">No spare parts found. <a asp-action="Create">Add the first spare part.</a></div>
+}
+else
+{
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Part Name</th>
+                        <th>Part Number</th>
+                        <th>Unit Price</th>
+                        <th>Stock</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var sp in Model.SpareParts)
+                    {
+                        <tr>
+                            <td><strong>@sp.Name</strong></td>
+                            <td><code>@sp.PartNumber</code></td>
+                            <td>€@sp.UnitPrice.ToString("F2")</td>
+                            <td>
+                                @if (sp.StockQuantity <= 5)
+                                {
+                                    <span class="badge bg-danger">@sp.StockQuantity</span>
+                                }
+                                else if (sp.StockQuantity <= 15)
+                                {
+                                    <span class="badge bg-warning text-dark">@sp.StockQuantity</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-success">@sp.StockQuantity</span>
+                                }
+                            </td>
+                            <td class="text-end">
+                                <a asp-action="Edit" asp-route-id="@sp.Id" class="btn btn-sm btn-outline-primary">Edit</a>
+                                <a asp-action="Delete" asp-route-id="@sp.Id" class="btn btn-sm btn-outline-danger">Delete</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}

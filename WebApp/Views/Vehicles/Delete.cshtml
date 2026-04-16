@@ -1,0 +1,43 @@
+@model WebApp.ViewModels.Client.VehicleClientViewModel
+@{
+    ViewData["Title"] = "Delete Vehicle";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card border-danger shadow-sm">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0">⚠️ Delete Vehicle</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-danger fw-bold">Are you sure you want to delete this vehicle?</p>
+                <dl class="row">
+                    <dt class="col-sm-4">Make / Model</dt>
+                    <dd class="col-sm-8">@Model.Year @Model.Make @Model.Model</dd>
+                    <dt class="col-sm-4">License Plate</dt>
+                    <dd class="col-sm-8"><span class="badge bg-secondary">@Model.LicensePlate</span></dd>
+                    @if (Model.Vin != null)
+                    {
+                        <dt class="col-sm-4">VIN</dt>
+                        <dd class="col-sm-8">@Model.Vin</dd>
+                    }
+                    @if (Model.Color != null)
+                    {
+                        <dt class="col-sm-4">Color</dt>
+                        <dd class="col-sm-8">@Model.Color</dd>
+                    }
+                </dl>
+                <div class="alert alert-warning">
+                    This action cannot be undone. All service orders linked to this vehicle may be affected.
+                </div>
+            </div>
+            <div class="card-footer d-flex gap-2">
+                <form asp-action="Delete" method="post">
+                    <input type="hidden" asp-for="Id" />
+                    <button type="submit" class="btn btn-danger">🗑️ Yes, Delete</button>
+                </form>
+                <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </div>
+    </div>
+</div>

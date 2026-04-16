@@ -1,0 +1,62 @@
+@model WebApp.Areas.Admin.ViewModels.ServiceOrderAdminListViewModel
+@{
+    ViewData["Title"] = "Service Orders";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>📋 Service Orders</h2>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead class="table-dark">
+                <tr>
+                    <th>Date</th>
+                    <th>Vehicle</th>
+                    <th>Owner</th>
+                    <th>Workshop</th>
+                    <th>Mechanic</th>
+                    <th>Status</th>
+                    <th>Total</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var o in Model.Orders)
+                {
+                    <tr>
+                        <td>@o.OrderDate.ToString("dd.MM.yyyy")</td>
+                        <td>@o.VehicleDisplay</td>
+                        <td>@o.OwnerName</td>
+                        <td>@o.WorkshopName</td>
+                        <td>@(o.MechanicName ?? "-")</td>
+                        <td>
+                            @{
+                                var badgeClass = o.Status switch
+                                {
+                                    App.Domain.Enums.ServiceOrderStatus.Pending => "bg-warning text-dark",
+                                    App.Domain.Enums.ServiceOrderStatus.InProgress => "bg-primary",
+                                    App.Domain.Enums.ServiceOrderStatus.Completed => "bg-success",
+                                    App.Domain.Enums.ServiceOrderStatus.Cancelled => "bg-danger",
+                                    _ => "bg-secondary"
+                                };
+                            }
+                            <span class="badge @badgeClass">@o.StatusName</span>
+                        </td>
+                        <td>€@o.TotalAmount.ToString("N2")</td>
+                        <td>
+                            <a asp-action="UpdateStatus" asp-route-id="@o.Id" class="btn btn-sm btn-outline-primary">
+                                Update Status
+                            </a>
+                        </td>
+                    </tr>
+                }
+                @if (!Model.Orders.Any())
+                {
+                    <tr><td colspan="8" class="text-center text-muted py-4">No service orders found.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
