@@ -2,7 +2,7 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: .ICID/Dockerfile
+      dockerfile: Dockerfile
     container_name: personalproject-frontend
     ports:
       - "81:80"
