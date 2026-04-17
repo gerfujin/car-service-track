@@ -1,11 +1,13 @@
+@using Microsoft.Extensions.Localization
+@inject IStringLocalizer<App.Resources.Views.CarService> Localizer
 @model WebApp.ViewModels.Client.ServiceOrderClientListViewModel
 @{
-    ViewData["Title"] = "Service Orders";
+    ViewData["Title"] = Localizer["Orders"];
     var canUpdateStatus = ViewBag.CanUpdateStatus == true;
 }
 
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>📋 @(User.IsInRole("admin") || User.IsInRole("mechanic") ? "All Service Orders" : "My Service Orders")</h2>
+    <h2>📋 @Localizer["Orders"]</h2>
 </div>
 
 @if (!Model.Orders.Any())
@@ -23,12 +25,12 @@ else
                 <thead class="table-dark">
                     <tr>
                         <th>Vehicle</th>
-                        <th>Workshop</th>
-                        <th>Mechanic</th>
-                        <th>Status</th>
-                        <th>Order Date</th>
-                        <th>Total</th>
-                        <th>Payment</th>
+                        <th>@Localizer["Workshop"]</th>
+                        <th>@Localizer["Mechanic"]</th>
+                        <th>@Localizer["Status"]</th>
+                        <th>@Localizer["OrderDate"]</th>
+                        <th>@Localizer["TotalAmount"]</th>
+                        <th>@Localizer["PaymentStatus"]</th>
                         @if (canUpdateStatus)
                         {
                             <th class="text-end">Actions</th>

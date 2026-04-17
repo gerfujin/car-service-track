@@ -16,11 +16,11 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="MyVehicles" xml:space="preserve">
-    <value>My Vehicles</value>
+  <data name="Vehicles" xml:space="preserve">
+    <value>Vehicles</value>
   </data>
-  <data name="MyOrders" xml:space="preserve">
-    <value>My Service Orders</value>
+  <data name="Orders" xml:space="preserve">
+    <value>Orders</value>
   </data>
   <data name="Payments" xml:space="preserve">
     <value>Payments</value>
@@ -52,6 +52,9 @@
   <data name="TotalAmount" xml:space="preserve">
     <value>Total Amount</value>
   </data>
+  <data name="FinalPrice" xml:space="preserve">
+    <value>Final Price</value>
+  </data>
   <data name="PaymentStatus" xml:space="preserve">
     <value>Payment Status</value>
   </data>
@@ -63,5 +66,50 @@
   </data>
   <data name="NoPhotosYet" xml:space="preserve">
     <value>No photos yet — Coming soon</value>
+  </data>
+  <data name="NavHome" xml:space="preserve">
+    <value>Home</value>
+  </data>
+  <data name="NavVehicles" xml:space="preserve">
+    <value>Vehicles</value>
+  </data>
+  <data name="NavOrders" xml:space="preserve">
+    <value>Orders</value>
+  </data>
+  <data name="NavPayments" xml:space="preserve">
+    <value>Payments</value>
+  </data>
+  <data name="NavMechanicPanel" xml:space="preserve">
+    <value>Mechanic Panel</value>
+  </data>
+  <data name="NavAdmin" xml:space="preserve">
+    <value>Admin</value>
+  </data>
+  <data name="AdminPanel" xml:space="preserve">
+    <value>Admin Panel</value>
+  </data>
+  <data name="AdminDashboard" xml:space="preserve">
+    <value>Dashboard</value>
+  </data>
+  <data name="AdminServiceOrders" xml:space="preserve">
+    <value>Service Orders</value>
+  </data>
+  <data name="AdminWorkshops" xml:space="preserve">
+    <value>Workshops</value>
+  </data>
+  <data name="AdminMechanics" xml:space="preserve">
+    <value>Mechanics</value>
+  </data>
+  <data name="AdminServices" xml:space="preserve">
+    <value>Services</value>
+  </data>
+  <data name="AdminSpareParts" xml:space="preserve">
+    <value>Spare Parts</value>
+  </data>
+  <data name="BackToSite" xml:space="preserve">
+    <value>Back to Site</value>
+  </data>
+  <data name="Logout" xml:space="preserve">
+    <value>Logout</value>
   </data>
 </root>

@@ -7,6 +7,10 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <EmbeddedResource Update="Views\CarService.resx">
+        <Generator>PublicResXFileCodeGenerator</Generator>
+        <LastGenOutput>CarService.Designer.cs</LastGenOutput>
+      </EmbeddedResource>
       <EmbeddedResource Update="Views\Home.resx">
         <Generator>PublicResXFileCodeGenerator</Generator>
         <LastGenOutput>Home.Designer.cs</LastGenOutput>
@@ -18,6 +22,11 @@
     </ItemGroup>
 
     <ItemGroup>
+      <Compile Update="Views\CarService.Designer.cs">
+        <DesignTime>True</DesignTime>
+        <AutoGen>True</AutoGen>
+        <DependentUpon>CarService.resx</DependentUpon>
+      </Compile>
       <Compile Update="Views\Home.Designer.cs">
         <DesignTime>True</DesignTime>
         <AutoGen>True</AutoGen>

@@ -1,3 +1,5 @@
+@using Microsoft.Extensions.Localization
+@inject IStringLocalizer<App.Resources.Views.CarService> Localizer
 @model WebApp.Areas.Admin.ViewModels.ServiceOrderStatusUpdateViewModel
 @{
     ViewData["Title"] = "Update Order Status";
@@ -29,6 +31,15 @@
                 <select asp-for="MechanicId" asp-items="Model.MechanicOptions" class="form-select">
                     <option value="">-- No mechanic assigned --</option>
                 </select>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="FinalPrice" class="form-label fw-semibold">@Localizer["FinalPrice"] <small class="text-muted fw-normal">(optional — overrides calculated total)</small></label>
+                <div class="input-group">
+                    <span class="input-group-text">€</span>
+                    <input asp-for="FinalPrice" class="form-control" type="number" step="0.01" min="0" placeholder="Leave empty to use calculated total" />
+                </div>
+                <span asp-validation-for="FinalPrice" class="text-danger small"></span>
             </div>
 
             <div class="mb-3">

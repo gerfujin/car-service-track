@@ -16,11 +16,11 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="MyVehicles" xml:space="preserve">
-    <value>Minu sõidukid</value>
+  <data name="Vehicles" xml:space="preserve">
+    <value>Sõidukid</value>
   </data>
-  <data name="MyOrders" xml:space="preserve">
-    <value>Minu teenindusorderid</value>
+  <data name="Orders" xml:space="preserve">
+    <value>Tellimused</value>
   </data>
   <data name="Payments" xml:space="preserve">
     <value>Maksed</value>
@@ -52,6 +52,9 @@
   <data name="TotalAmount" xml:space="preserve">
     <value>Kogusumma</value>
   </data>
+  <data name="FinalPrice" xml:space="preserve">
+    <value>Lõpphind</value>
+  </data>
   <data name="PaymentStatus" xml:space="preserve">
     <value>Makse staatus</value>
   </data>
@@ -63,5 +66,50 @@
   </data>
   <data name="NoPhotosYet" xml:space="preserve">
     <value>Fotosid pole veel — Tulemas peagi</value>
+  </data>
+  <data name="NavHome" xml:space="preserve">
+    <value>Avaleht</value>
+  </data>
+  <data name="NavVehicles" xml:space="preserve">
+    <value>Sõidukid</value>
+  </data>
+  <data name="NavOrders" xml:space="preserve">
+    <value>Tellimused</value>
+  </data>
+  <data name="NavPayments" xml:space="preserve">
+    <value>Maksed</value>
+  </data>
+  <data name="NavMechanicPanel" xml:space="preserve">
+    <value>Mehhaanik</value>
+  </data>
+  <data name="NavAdmin" xml:space="preserve">
+    <value>Admin</value>
+  </data>
+  <data name="AdminPanel" xml:space="preserve">
+    <value>Adminpaneel</value>
+  </data>
+  <data name="AdminDashboard" xml:space="preserve">
+    <value>Töölaud</value>
+  </data>
+  <data name="AdminServiceOrders" xml:space="preserve">
+    <value>Teenindusorderid</value>
+  </data>
+  <data name="AdminWorkshops" xml:space="preserve">
+    <value>Töökojad</value>
+  </data>
+  <data name="AdminMechanics" xml:space="preserve">
+    <value>Mehhaanikud</value>
+  </data>
+  <data name="AdminServices" xml:space="preserve">
+    <value>Teenused</value>
+  </data>
+  <data name="AdminSpareParts" xml:space="preserve">
+    <value>Varuosad</value>
+  </data>
+  <data name="BackToSite" xml:space="preserve">
+    <value>Tagasi saidile</value>
+  </data>
+  <data name="Logout" xml:space="preserve">
+    <value>Logi välja</value>
   </data>
 </root>

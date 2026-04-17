@@ -1,14 +1,16 @@
+@using Microsoft.Extensions.Localization
+@inject IStringLocalizer<App.Resources.Views.CarService> Localizer
 @model WebApp.ViewModels.Client.VehicleListClientViewModel
 @{
-    ViewData["Title"] = "My Vehicles";
+    ViewData["Title"] = Localizer["Vehicles"];
     var isReadOnly = ViewBag.IsReadOnly == true;
 }
 
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>🚗 @(isReadOnly ? "All Vehicles" : "My Vehicles")</h2>
+    <h2>🚗 @Localizer["Vehicles"]</h2>
     @if (!isReadOnly && (User.IsInRole("admin") || User.IsInRole("client")))
     {
-        <a asp-action="Create" class="btn btn-primary">+ Add Vehicle</a>
+        <a asp-action="Create" class="btn btn-primary">+ @Localizer["AddVehicle"]</a>
     }
 </div>
 
@@ -16,11 +18,11 @@
 {
     <div class="text-center py-5">
         <div class="fs-1 mb-3">🚗</div>
-        <h4 class="text-muted">No vehicles yet</h4>
+        <h4 class="text-muted">@Localizer["Vehicles"]</h4>
         @if (!isReadOnly)
         {
             <p class="text-muted">Add your first vehicle to start tracking service history.</p>
-            <a asp-action="Create" class="btn btn-primary">Add Vehicle</a>
+            <a asp-action="Create" class="btn btn-primary">@Localizer["AddVehicle"]</a>
         }
     </div>
 }
@@ -42,9 +44,9 @@ else
                         </p>
                         @if (v.Mileage.HasValue)
                         {
-                            <p class="text-muted small">Mileage: @v.Mileage.Value.ToString("N0") km</p>
+                            <p class="text-muted small">@Localizer["Mileage"]: @v.Mileage.Value.ToString("N0") km</p>
                         }
-                        <p class="text-muted small">@v.ServiceOrderCount service order(s)</p>
+                        <p class="text-muted small">@v.ServiceOrderCount @Localizer["Orders"].ToString().ToLower()</p>
                     </div>
                     <div class="card-footer bg-transparent d-flex gap-1 flex-wrap">
                         <a asp-action="Details" asp-route-id="@v.Id" class="btn btn-sm btn-outline-primary">Details</a>

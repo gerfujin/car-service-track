@@ -1,3 +1,5 @@
+@using Microsoft.Extensions.Localization
+@inject IStringLocalizer<App.Resources.Views.CarService> Localizer
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -26,49 +28,49 @@
         <nav class="col-md-2 d-none d-md-block sidebar py-3">
             <div class="text-white mb-4 px-3">
                 <h5>🔧 CarServiceTrack</h5>
-                <small class="text-muted">Admin Panel</small>
+                <small class="text-muted">@Localizer["AdminPanel"]</small>
             </div>
             <ul class="nav flex-column px-2">
                 <li class="nav-item">
                     <a class="nav-link" asp-area="Admin" asp-controller="Dashboard" asp-action="Index">
-                        📊 Dashboard
+                        📊 @Localizer["AdminDashboard"]
                     </a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link" asp-area="Admin" asp-controller="ServiceOrders" asp-action="Index">
-                        📋 Service Orders
+                        📋 @Localizer["AdminServiceOrders"]
                     </a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link" asp-area="Admin" asp-controller="Workshops" asp-action="Index">
-                        🏭 Workshops
+                        🏭 @Localizer["AdminWorkshops"]
                     </a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link" asp-area="Admin" asp-controller="Mechanics" asp-action="Index">
-                        👨‍🔧 Mechanics
+                        👨‍🔧 @Localizer["AdminMechanics"]
                     </a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link" asp-area="Admin" asp-controller="Services" asp-action="Index">
-                        🔩 Services
+                        🔩 @Localizer["AdminServices"]
                     </a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link" asp-area="Admin" asp-controller="SpareParts" asp-action="Index">
-                        🔧 Spare Parts
+                        🔧 @Localizer["AdminSpareParts"]
                     </a>
                 </li>
                 <hr class="border-secondary" />
                 <li class="nav-item">
                     <a class="nav-link" asp-area="" asp-controller="Home" asp-action="Index">
-                        🏠 Back to Site
+                        🏠 @Localizer["BackToSite"]
                     </a>
                 </li>
                 <li class="nav-item">
                     <form asp-area="Identity" asp-page="/Account/Logout" method="post">
                         <button type="submit" class="nav-link btn btn-link text-start w-100">
-                            🚪 Logout
+                            🚪 @Localizer["Logout"]
                         </button>
                     </form>
                 </li>

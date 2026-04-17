@@ -1,0 +1,33 @@
+  Определение проектов для восстановления...
+D:\IdeaProjects\PersonalP\App.DAL.EF\App.DAL.EF.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.5 has a known high severity vulnerability, https://github.com/advisories/GHSA-37gx-xxp4-5rgx [D:\IdeaProjects\PersonalP\WebApp\WebApp.csproj]
+D:\IdeaProjects\PersonalP\App.DAL.EF\App.DAL.EF.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.5 has a known high severity vulnerability, https://github.com/advisories/GHSA-w3x6-4m5h-cxqf [D:\IdeaProjects\PersonalP\WebApp\WebApp.csproj]
+D:\IdeaProjects\PersonalP\WebApp\WebApp.csproj : warning NU1901: Package 'NuGet.Packaging' 6.12.1 has a known low severity vulnerability, https://github.com/advisories/GHSA-g4vj-cjjj-v7hg
+D:\IdeaProjects\PersonalP\WebApp\WebApp.csproj : warning NU1901: Package 'NuGet.Protocol' 6.12.1 has a known low severity vulnerability, https://github.com/advisories/GHSA-g4vj-cjjj-v7hg
+  Все проекты обновлены для восстановления.
+D:\IdeaProjects\PersonalP\WebApp\WebApp.csproj : warning NU1901: Package 'NuGet.Packaging' 6.12.1 has a known low severity vulnerability, https://github.com/advisories/GHSA-g4vj-cjjj-v7hg
+D:\IdeaProjects\PersonalP\WebApp\WebApp.csproj : warning NU1901: Package 'NuGet.Protocol' 6.12.1 has a known low severity vulnerability, https://github.com/advisories/GHSA-g4vj-cjjj-v7hg
+D:\IdeaProjects\PersonalP\App.DAL.EF\App.DAL.EF.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.5 has a known high severity vulnerability, https://github.com/advisories/GHSA-37gx-xxp4-5rgx
+D:\IdeaProjects\PersonalP\App.DAL.EF\App.DAL.EF.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.5 has a known high severity vulnerability, https://github.com/advisories/GHSA-w3x6-4m5h-cxqf
+  Base.Contracts -> D:\IdeaProjects\PersonalP\Base.Contracts\bin\Debug\net10.0\Base.Contracts.dll
+  App.Resources -> D:\IdeaProjects\PersonalP\App.Resources\bin\Debug\net10.0\App.Resources.dll
+  Base.Helpers -> D:\IdeaProjects\PersonalP\Base.Helpers\bin\Debug\net10.0\Base.Helpers.dll
+  Base.Domain -> D:\IdeaProjects\PersonalP\Base.Domain\bin\Debug\net10.0\Base.Domain.dll
+  App.Domain -> D:\IdeaProjects\PersonalP\App.Domain\bin\Debug\net10.0\App.Domain.dll
+  App.DTO -> D:\IdeaProjects\PersonalP\App.DTO\bin\Debug\net10.0\App.DTO.dll
+  App.DAL.EF -> D:\IdeaProjects\PersonalP\App.DAL.EF\bin\Debug\net10.0\App.DAL.EF.dll
+  WebApp -> D:\IdeaProjects\PersonalP\WebApp\bin\Debug\net10.0\WebApp.dll
+
+Сборка успешно завершена.
+
+D:\IdeaProjects\PersonalP\App.DAL.EF\App.DAL.EF.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.5 has a known high severity vulnerability, https://github.com/advisories/GHSA-37gx-xxp4-5rgx [D:\IdeaProjects\PersonalP\WebApp\WebApp.csproj]
+D:\IdeaProjects\PersonalP\App.DAL.EF\App.DAL.EF.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.5 has a known high severity vulnerability, https://github.com/advisories/GHSA-w3x6-4m5h-cxqf [D:\IdeaProjects\PersonalP\WebApp\WebApp.csproj]
+D:\IdeaProjects\PersonalP\WebApp\WebApp.csproj : warning NU1901: Package 'NuGet.Packaging' 6.12.1 has a known low severity vulnerability, https://github.com/advisories/GHSA-g4vj-cjjj-v7hg
+D:\IdeaProjects\PersonalP\WebApp\WebApp.csproj : warning NU1901: Package 'NuGet.Protocol' 6.12.1 has a known low severity vulnerability, https://github.com/advisories/GHSA-g4vj-cjjj-v7hg
+D:\IdeaProjects\PersonalP\WebApp\WebApp.csproj : warning NU1901: Package 'NuGet.Packaging' 6.12.1 has a known low severity vulnerability, https://github.com/advisories/GHSA-g4vj-cjjj-v7hg
+D:\IdeaProjects\PersonalP\WebApp\WebApp.csproj : warning NU1901: Package 'NuGet.Protocol' 6.12.1 has a known low severity vulnerability, https://github.com/advisories/GHSA-g4vj-cjjj-v7hg
+D:\IdeaProjects\PersonalP\App.DAL.EF\App.DAL.EF.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.5 has a known high severity vulnerability, https://github.com/advisories/GHSA-37gx-xxp4-5rgx
+D:\IdeaProjects\PersonalP\App.DAL.EF\App.DAL.EF.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.5 has a known high severity vulnerability, https://github.com/advisories/GHSA-w3x6-4m5h-cxqf
+    Предупреждений: 8
+    Ошибок: 0
+
+Прошло времени 00:00:04.00

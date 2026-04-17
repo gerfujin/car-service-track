@@ -1,4 +1,6 @@
-﻿<!DOCTYPE html>
+﻿@using Microsoft.Extensions.Localization
+@inject IStringLocalizer<App.Resources.Views.CarService> Localizer
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
@@ -20,34 +22,34 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
+                        <a class="nav-link" asp-area="" asp-controller="Home" asp-action="Index">@Localizer["NavHome"]</a>
                     </li>
                     @if (User.Identity?.IsAuthenticated == true)
                     {
                         @* Vehicles: all roles see it *@
                         <li class="nav-item">
-                            <a class="nav-link" asp-area="" asp-controller="Vehicles" asp-action="Index">🚗 Vehicles</a>
+                            <a class="nav-link" asp-area="" asp-controller="Vehicles" asp-action="Index">🚗 @Localizer["NavVehicles"]</a>
                         </li>
                         @* Orders: all roles see it *@
                         <li class="nav-item">
-                            <a class="nav-link" asp-area="" asp-controller="ServiceOrders" asp-action="Index">📋 Orders</a>
+                            <a class="nav-link" asp-area="" asp-controller="ServiceOrders" asp-action="Index">📋 @Localizer["NavOrders"]</a>
                         </li>
                         @* Payments: all roles see it *@
                         <li class="nav-item">
-                            <a class="nav-link" asp-area="" asp-controller="Payments" asp-action="Index">💰 Payments</a>
+                            <a class="nav-link" asp-area="" asp-controller="Payments" asp-action="Index">💰 @Localizer["NavPayments"]</a>
                         </li>
                         @* Mechanic panel: mechanic only *@
                         @if (User.IsInRole("mechanic"))
                         {
                             <li class="nav-item">
-                                <a class="nav-link text-info" asp-area="Mechanic" asp-controller="Dashboard" asp-action="Index">👨‍🔧 Mechanic Panel</a>
+                                <a class="nav-link text-info" asp-area="Mechanic" asp-controller="Dashboard" asp-action="Index">👨‍🔧 @Localizer["NavMechanicPanel"]</a>
                             </li>
                         }
                         @* Admin panel: admin only *@
                         @if (User.IsInRole("admin"))
                         {
                             <li class="nav-item">
-                                <a class="nav-link text-warning" asp-area="Admin" asp-controller="Dashboard" asp-action="Index">⚙️ Admin</a>
+                                <a class="nav-link text-warning" asp-area="Admin" asp-controller="Dashboard" asp-action="Index">⚙️ @Localizer["NavAdmin"]</a>
                             </li>
                         }
                     }

@@ -11,6 +11,11 @@ public class ServiceOrder : BaseEntity
 
     public ServiceOrderStatus Status { get; set; } = ServiceOrderStatus.Pending;
 
+    /// <summary>
+    /// Admin-set final price for the order. Overrides the sum of items/parts when set.
+    /// </summary>
+    public decimal? FinalPrice { get; set; }
+
     public DateTime OrderDate { get; set; } = DateTime.UtcNow;
     public DateTime? CompletedDate { get; set; }
 

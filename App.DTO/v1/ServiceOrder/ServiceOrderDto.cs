@@ -17,4 +17,6 @@ public class ServiceOrderDto
     public Guid? MechanicId { get; set; }
     public string? MechanicName { get; set; }
     public decimal TotalAmount { get; set; }
+    /// <summary>Admin-set final price. When set, overrides the calculated TotalAmount.</summary>
+    public decimal? FinalPrice { get; set; }
 }

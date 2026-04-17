@@ -137,5 +137,9 @@ public class AppDbContext : IdentityDbContext<AppUser, AppRole, Guid>, IDataProt
         builder.Entity<Payment>()
             .Property(p => p.Amount)
             .HasPrecision(18, 2);
+
+        builder.Entity<ServiceOrder>()
+            .Property(so => so.FinalPrice)
+            .HasPrecision(18, 2);
     }
 }

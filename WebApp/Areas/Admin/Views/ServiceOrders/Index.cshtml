@@ -1,10 +1,12 @@
+@using Microsoft.Extensions.Localization
+@inject IStringLocalizer<App.Resources.Views.CarService> Localizer
 @model WebApp.Areas.Admin.ViewModels.ServiceOrderAdminListViewModel
 @{
-    ViewData["Title"] = "Service Orders";
+    ViewData["Title"] = Localizer["AdminServiceOrders"];
 }
 
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>📋 Service Orders</h2>
+    <h2>📋 @Localizer["AdminServiceOrders"]</h2>
 </div>
 
 <div class="card shadow-sm">
@@ -15,10 +17,11 @@
                     <th>Date</th>
                     <th>Vehicle</th>
                     <th>Owner</th>
-                    <th>Workshop</th>
-                    <th>Mechanic</th>
-                    <th>Status</th>
-                    <th>Total</th>
+                    <th>@Localizer["Workshop"]</th>
+                    <th>@Localizer["Mechanic"]</th>
+                    <th>@Localizer["Status"]</th>
+                    <th>@Localizer["TotalAmount"]</th>
+                    <th>@Localizer["FinalPrice"]</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -46,15 +49,25 @@
                         </td>
                         <td>€@o.TotalAmount.ToString("N2")</td>
                         <td>
+                            @if (o.FinalPrice.HasValue)
+                            {
+                                <strong class="text-success">€@o.FinalPrice.Value.ToString("N2")</strong>
+                            }
+                            else
+                            {
+                                <span class="text-muted">—</span>
+                            }
+                        </td>
+                        <td>
                             <a asp-action="UpdateStatus" asp-route-id="@o.Id" class="btn btn-sm btn-outline-primary">
-                                Update Status
+                                Update
                             </a>
                         </td>
                     </tr>
                 }
                 @if (!Model.Orders.Any())
                 {
-                    <tr><td colspan="8" class="text-center text-muted py-4">No service orders found.</td></tr>
+                    <tr><td colspan="9" class="text-center text-muted py-4">No service orders found.</td></tr>
                 }
             </tbody>
         </table>

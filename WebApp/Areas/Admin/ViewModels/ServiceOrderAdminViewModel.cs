@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using App.Domain.Enums;
 using Microsoft.AspNetCore.Mvc.Rendering;
 
@@ -16,6 +17,8 @@ public class ServiceOrderAdminViewModel
     public string WorkshopName { get; set; } = default!;
     public string? MechanicName { get; set; }
     public decimal TotalAmount { get; set; }
+    /// <summary>Admin-set final price. When set, overrides the calculated TotalAmount.</summary>
+    public decimal? FinalPrice { get; set; }
     public bool HasPayment { get; set; }
 }
 
@@ -31,6 +34,10 @@ public class ServiceOrderStatusUpdateViewModel
     public ServiceOrderStatus NewStatus { get; set; }
     public string? Notes { get; set; }
     public Guid? MechanicId { get; set; }
+
+    [Range(0, double.MaxValue, ErrorMessage = "Final price must be 0 or greater.")]
+    public decimal? FinalPrice { get; set; }
+
     public IEnumerable<SelectListItem> StatusOptions { get; set; } = new List<SelectListItem>();
     public IEnumerable<SelectListItem> MechanicOptions { get; set; } = new List<SelectListItem>();
 }

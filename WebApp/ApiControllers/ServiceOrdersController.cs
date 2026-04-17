@@ -85,7 +85,8 @@ public class ServiceOrdersController : ControllerBase
                     : 0) +
                     (so.ServiceOrderParts != null
                     ? so.ServiceOrderParts.Sum(p => p.Quantity * p.UnitPrice)
-                    : 0)
+                    : 0),
+                FinalPrice = so.FinalPrice
             })
             .ToListAsync();
 
@@ -137,7 +138,8 @@ public class ServiceOrdersController : ControllerBase
                     : 0) +
                     (so.ServiceOrderParts != null
                     ? so.ServiceOrderParts.Sum(p => p.Quantity * p.UnitPrice)
-                    : 0)
+                    : 0),
+                FinalPrice = so.FinalPrice
             })
             .FirstOrDefaultAsync();
 

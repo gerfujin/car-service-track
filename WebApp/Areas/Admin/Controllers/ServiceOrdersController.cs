@@ -46,6 +46,7 @@ public class ServiceOrdersController : Controller
                 MechanicName = so.Mechanic != null ? $"{so.Mechanic.FirstName} {so.Mechanic.LastName}" : null,
                 TotalAmount = (so.ServiceOrderItems != null ? so.ServiceOrderItems.Sum(i => i.Quantity * i.UnitPrice) : 0) +
                               (so.ServiceOrderParts != null ? so.ServiceOrderParts.Sum(p => p.Quantity * p.UnitPrice) : 0),
+                FinalPrice = so.FinalPrice,
                 HasPayment = so.Payment != null
             })
             .ToListAsync();
@@ -76,6 +77,7 @@ public class ServiceOrdersController : Controller
             CurrentStatus = order.Status,
             NewStatus = order.Status,
             MechanicId = order.MechanicId,
+            FinalPrice = order.FinalPrice,
             StatusOptions = Enum.GetValues<ServiceOrderStatus>()
                 .Select(s => new SelectListItem { Value = ((int)s).ToString(), Text = s.ToString() })
                 .ToList(),
@@ -91,12 +93,25 @@ public class ServiceOrdersController : Controller
     {
         if (id != vm.Id) return BadRequest();
 
+        if (!ModelState.IsValid)
+        {
+            // Repopulate dropdowns on validation failure
+            vm.StatusOptions = Enum.GetValues<ServiceOrderStatus>()
+                .Select(s => new SelectListItem { Value = ((int)s).ToString(), Text = s.ToString() })
+                .ToList();
+            vm.MechanicOptions = await _context.Mechanics
+                .Select(m => new SelectListItem { Value = m.Id.ToString(), Text = $"{m.FirstName} {m.LastName}" })
+                .ToListAsync();
+            return View(vm);
+        }
+
         var order = await _context.ServiceOrders.FindAsync(id);
         if (order == null) return NotFound();
 
         var oldStatus = order.Status;
         order.Status = vm.NewStatus;
         order.MechanicId = vm.MechanicId;
+        order.FinalPrice = vm.FinalPrice;
         order.UpdatedAt = DateTime.UtcNow;
 
         if (vm.NewStatus == ServiceOrderStatus.Completed)
