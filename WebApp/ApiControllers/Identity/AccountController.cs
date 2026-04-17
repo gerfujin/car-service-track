@@ -97,6 +97,15 @@ public class AccountController : ControllerBase
             );
         }
 
+        // Assign default role "client" to every newly registered user
+        var roleResult = await _userManager.AddToRoleAsync(appUser, "client");
+        if (!roleResult.Succeeded)
+        {
+            _logger.LogWarning("Failed to assign 'client' role to user {Email}: {Errors}",
+                registrationData.Email,
+                string.Join(", ", roleResult.Errors.Select(e => e.Description)));
+        }
+
         // save into claims also the user full name
         /*
         result = await _userManager.AddClaimsAsync(appUser, new List<Claim>()
