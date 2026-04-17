@@ -15,15 +15,7 @@ public static class AppDataInit
 
     public static void MigrateDatabase(AppDbContext context)
     {
-        if (AppDbContext.UseSqlite)
-        {
-            // SQLite: use EnsureCreated to avoid migration provider mismatch
-            context.Database.EnsureCreated();
-        }
-        else
-        {
-            context.Database.Migrate();
-        }
+        context.Database.Migrate();
     }
 
     public static void SeedAppData(AppDbContext context)

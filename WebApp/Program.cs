@@ -13,7 +13,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using Npgsql;
 using Swashbuckle.AspNetCore.SwaggerGen;
 using WebApp;
 
@@ -23,44 +22,19 @@ var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ??
                        throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 
-// Detect if we should use SQLite (Development without PostgreSQL) or PostgreSQL (Production)
-var useSqlite = builder.Environment.IsDevelopment() &&
-                connectionString.Contains("Data Source=", StringComparison.OrdinalIgnoreCase);
-
-// Set the flag on AppDbContext so OnModelCreating uses correct column types
-AppDbContext.UseSqlite = useSqlite;
-
-if (useSqlite)
-{
-    builder.Services
-        .AddDbContext<AppDbContext>(options => options
-            .UseSqlite(connectionString)
-            .EnableDetailedErrors()
-            .EnableSensitiveDataLogging()
-            .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTrackingWithIdentityResolution)
-        );
-}
-else
-{
-    // used for older style [Column(TypeName = "jsonb")] for LangStr
-    #pragma warning disable CS0618 // Type or member is obsolete
-    //NpgsqlConnection.GlobalTypeMapper.EnableDynamicJson();
-    #pragma warning restore CS0618 // Type or member is obsolete
-
-    builder.Services
-        .AddDbContext<AppDbContext>(options => options
-            .UseNpgsql(
-                connectionString,
-                o => { o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery); }
-            )
-            .ConfigureWarnings(w =>
-                w.Throw(RelationalEventId.MultipleCollectionIncludeWarning)
-            )
-            .EnableDetailedErrors()
-            .EnableSensitiveDataLogging()
-            .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTrackingWithIdentityResolution)
-        );
-}
+builder.Services
+    .AddDbContext<AppDbContext>(options => options
+        .UseNpgsql(
+            connectionString,
+            o => { o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery); }
+        )
+        .ConfigureWarnings(w =>
+            w.Throw(RelationalEventId.MultipleCollectionIncludeWarning)
+        )
+        .EnableDetailedErrors()
+        .EnableSensitiveDataLogging()
+        .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTrackingWithIdentityResolution)
+    );
 
 
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
@@ -258,13 +232,6 @@ static void SetupAppData(IApplicationBuilder app, IWebHostEnvironment env, IConf
 
 static void WaitDbConnection(AppDbContext ctx, ILogger<IApplicationBuilder> logger)
 {
-    // SQLite: file-based, always available — skip wait loop
-    if (AppDbContext.UseSqlite)
-    {
-        logger.LogInformation("Using SQLite — skipping DB connection wait.");
-        return;
-    }
-
     while (true)
     {
         try
@@ -273,7 +240,7 @@ static void WaitDbConnection(AppDbContext ctx, ILogger<IApplicationBuilder> logg
             ctx.Database.CloseConnection();
             return;
         }
-        catch (Npgsql.PostgresException e)
+        catch (Exception e)
         {
             logger.LogWarning("Checked postgres db connection. Got: {}", e.Message);
 

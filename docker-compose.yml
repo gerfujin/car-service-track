@@ -1,76 +1,46 @@
 services:
-  aspnet:
-    build: .
-    container_name: aspnet
-    ports:
-      - "8080:8080"
-    depends_on:
-      - postgres
-    logging:
-      options:
-        max-size: 10m
-        max-file: "3"
-    environment:
-      ASPNETCORE_ENVIRONMENT: "Production"
-      ConnectionStrings__DefaultConnection: "Server=postgres;Port=5432;Database=dockerdemo;Username=postgres;Password=postgres"
-    #volumes:
-    #  - aspnet-uploads:/app/WebApp/wwwroot/uploads
-
-  vue-client:
+  frontend:
     build:
-      context: ./client-app
+      context: .
       dockerfile: Dockerfile
-      args:
-        # VITE_API_BASE_URL is intentionally empty in Docker:
-        # nginx (nginx.conf) proxies /api/* requests to the aspnet container,
-        # so the Vue app uses same-origin API calls (no cross-origin issues).
-        VITE_API_BASE_URL: ""
-    container_name: vue-client
+    container_name: personalproject-frontend
     ports:
-      - "3000:80"
+      - "81:80"
     depends_on:
-      - aspnet
-    logging:
-      options:
-        max-size: 10m
-        max-file: "3"
-
-  postgres:
-    container_name: "postgres"
-    pull_policy: always
-    # https://github.com/baosystems/docker-postgis/pkgs/container/postgis
-    image: ghcr.io/baosystems/postgis:18
-    command: postgres -c 'max_connections=1000'
+      - backend
     restart: unless-stopped
-    logging:
-      options:
-        max-size: 10m
-        max-file: "3"
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-    volumes:
-      - postgres-dev-data:/var/lib/postgresql
 
-  pgadmin:
-    container_name: "pgadmin"
-    pull_policy: always
-    image: dpage/pgadmin4:latest
-    logging:
-      options:
-        max-size: 10m
-        max-file: "3"
-    environment:
-      - PGADMIN_DEFAULT_EMAIL=akaver@akaver.com
-      - PGADMIN_DEFAULT_PASSWORD=Foo.bar1
-      - PGADMIN_CONFIG_WTF_CSRF_ENABLED=False
-      - PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION=False
+  backend:
+    build:
+      context: .
+      dockerfile: WebApp/Dockerfile
+    container_name: personalproject-backend
     ports:
-      - "88:80"
+      - "80:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=carservicetrack;Username=postgres;Password=postgres
+    restart: unless-stopped
+
+  db:
+    image: postgres:16
+    container_name: personalproject-db
+    environment:
+      POSTGRES_DB: carservicetrack
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     volumes:
-      - pgadmin-data:/var/lib/pgadmin
-    
+      - personalproject_pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d carservicetrack"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
 volumes:
-  postgres-dev-data:
-  aspnet-uploads:
-  pgadmin-data:
+  personalproject_pgdata:

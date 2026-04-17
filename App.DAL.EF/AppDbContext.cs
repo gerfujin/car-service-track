@@ -10,12 +10,6 @@ namespace App.DAL.EF;
 
 public class AppDbContext : IdentityDbContext<AppUser, AppRole, Guid>, IDataProtectionKeyContext
 {
-    /// <summary>
-    /// Set to true when using SQLite (Development).
-    /// SQLite does not support jsonb — LangStr columns will use TEXT instead.
-    /// </summary>
-    public static bool UseSqlite { get; set; } = false;
-
     // Legacy
     public DbSet<ListItem> ListItems { get; set; }
 
@@ -55,16 +49,13 @@ public class AppDbContext : IdentityDbContext<AppUser, AppRole, Guid>, IDataProt
             relationship.DeleteBehavior = DeleteBehavior.Restrict;
         }
 
-        // Column type: jsonb for PostgreSQL, TEXT for SQLite
-        var langStrColumnType = UseSqlite ? "TEXT" : "jsonb";
-
         // LangStr JSON conversions for ListItem (legacy)
         builder.Entity<ListItem>().Property(e => e.Summary)
             .HasConversion(
                 v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
                 v => JsonSerializer.Deserialize<LangStr>(v, (JsonSerializerOptions?)null)!
             )
-            .HasColumnType(langStrColumnType);
+            .HasColumnType("jsonb");
 
         // LangStr JSON conversions for Workshop
         builder.Entity<Workshop>().Property(e => e.Name)
@@ -72,14 +63,14 @@ public class AppDbContext : IdentityDbContext<AppUser, AppRole, Guid>, IDataProt
                 v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
                 v => JsonSerializer.Deserialize<LangStr>(v, (JsonSerializerOptions?)null)!
             )
-            .HasColumnType(langStrColumnType);
+            .HasColumnType("jsonb");
 
         builder.Entity<Workshop>().Property(e => e.Address)
             .HasConversion(
                 v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
                 v => JsonSerializer.Deserialize<LangStr>(v, (JsonSerializerOptions?)null)!
             )
-            .HasColumnType(langStrColumnType);
+            .HasColumnType("jsonb");
 
         // LangStr JSON conversions for Service
         builder.Entity<Service>().Property(e => e.Name)
@@ -87,14 +78,14 @@ public class AppDbContext : IdentityDbContext<AppUser, AppRole, Guid>, IDataProt
                 v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
                 v => JsonSerializer.Deserialize<LangStr>(v, (JsonSerializerOptions?)null)!
             )
-            .HasColumnType(langStrColumnType);
+            .HasColumnType("jsonb");
 
         builder.Entity<Service>().Property(e => e.Description)
             .HasConversion(
                 v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
                 v => JsonSerializer.Deserialize<LangStr>(v, (JsonSerializerOptions?)null)!
             )
-            .HasColumnType(langStrColumnType);
+            .HasColumnType("jsonb");
 
         // LangStr JSON conversions for SparePart
         builder.Entity<SparePart>().Property(e => e.Name)
@@ -102,7 +93,7 @@ public class AppDbContext : IdentityDbContext<AppUser, AppRole, Guid>, IDataProt
                 v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
                 v => JsonSerializer.Deserialize<LangStr>(v, (JsonSerializerOptions?)null)!
             )
-            .HasColumnType(langStrColumnType);
+            .HasColumnType("jsonb");
 
         // Owner -> AppUser: one-to-one
         builder.Entity<Owner>()

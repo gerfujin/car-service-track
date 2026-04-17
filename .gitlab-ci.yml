@@ -8,4 +8,5 @@ deploy:
   tags:
     - shared
   script:
-    - docker system prune -f --filter "until=24h" && docker compose -p aspnetdemo up --build --remove-orphans --detach
+    - docker compose -p personalproject down || true
+    - docker compose -p personalproject up --build --remove-orphans -d
