@@ -13,6 +13,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using Npgsql;
 using Swashbuckle.AspNetCore.SwaggerGen;
 using WebApp;
 
@@ -98,8 +99,26 @@ builder.Services.Configure<RequestLocalizationOptions>(options =>
 
 builder.Services.AddCors(options =>
 {
+    var localFrontendOrigins = builder.Configuration
+        .GetSection("Cors:AllowedOrigins")
+        .Get<string[]>()
+        ?.Where(x => !string.IsNullOrWhiteSpace(x))
+        .Select(x => x.TrimEnd('/'))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray() ?? Array.Empty<string>();
+
     options.AddPolicy("CorsAllowAll", policy =>
     {
+        if (localFrontendOrigins.Length > 0)
+        {
+            policy
+                .WithOrigins(localFrontendOrigins)
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .WithExposedHeaders("X-Version", "X-Version-Created-At");
+            return;
+        }
+
         policy
             .AllowAnyOrigin()
             .AllowAnyHeader()
@@ -248,14 +267,47 @@ static void WaitDbConnection(AppDbContext ctx, ILogger<IApplicationBuilder> logg
         {
             logger.LogWarning("Checked postgres db connection. Got: {}", e.Message);
 
-            if (e.Message.Contains("does not exist"))
+            if (e.Message.Contains("does not exist", StringComparison.OrdinalIgnoreCase))
             {
                 logger.LogWarning("Applying migration, probably db is not there (but server is)");
                 return;
+            }
+
+            if (IsNonRecoverableConnectionError(e))
+            {
+                logger.LogError(e, "Non-recoverable database connection error. Stopping retries.");
+                throw;
             }
 
             logger.LogWarning("Waiting for db connection. Sleep 1 sec");
             System.Threading.Thread.Sleep(1000);
         }
     }
+}
+
+static bool IsNonRecoverableConnectionError(Exception exception)
+{
+    Exception? current = exception;
+    while (current != null)
+    {
+        if (current is ArgumentException or FormatException)
+        {
+            return true;
+        }
+
+        if (current is NpgsqlException npgsqlException)
+        {
+            var message = npgsqlException.Message;
+            if (message.Contains("Invalid host", StringComparison.OrdinalIgnoreCase) ||
+                message.Contains("No such host is known", StringComparison.OrdinalIgnoreCase) ||
+                message.Contains("tcp://", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        current = current.InnerException;
+    }
+
+    return false;
 }

@@ -21,16 +21,20 @@ using Microsoft.EntityFrameworkCore;
 [Route("/api/v{version:apiVersion}/identity/[controller]/[action]")]
 public class AccountController : ControllerBase
 {
+    private const string ClientRoleName = "Client";
     private readonly UserManager<AppUser> _userManager;
+    private readonly RoleManager<AppRole> _roleManager;
     private readonly ILogger<AccountController> _logger;
     private readonly SignInManager<AppUser> _signInManager;
     private readonly IConfiguration _configuration;
     private readonly AppDbContext _context;
 
     public AccountController(UserManager<AppUser> userManager, ILogger<AccountController> logger,
-        SignInManager<AppUser> signInManager, IConfiguration configuration, AppDbContext context)
+        SignInManager<AppUser> signInManager, IConfiguration configuration, AppDbContext context,
+        RoleManager<AppRole> roleManager)
     {
         _userManager = userManager;
+        _roleManager = roleManager;
         _logger = logger;
         _signInManager = signInManager;
         _configuration = configuration;
@@ -97,13 +101,22 @@ public class AccountController : ControllerBase
             );
         }
 
-        // Assign default role "client" to every newly registered user
-        var roleResult = await _userManager.AddToRoleAsync(appUser, "client");
+        // Assign default role "Client" to every newly registered user
+        var roleResult = await EnsureClientRoleAssignedAsync(appUser);
         if (!roleResult.Succeeded)
         {
-            _logger.LogWarning("Failed to assign 'client' role to user {Email}: {Errors}",
+            _logger.LogWarning("Failed to assign '{Role}' role to user {Email}: {Errors}",
+                ClientRoleName,
                 registrationData.Email,
                 string.Join(", ", roleResult.Errors.Select(e => e.Description)));
+
+            return BadRequest(
+                new RestApiErrorResponse()
+                {
+                    Status = HttpStatusCode.BadRequest,
+                    Error = roleResult.Errors.First().Description
+                }
+            );
         }
 
         // save into claims also the user full name
@@ -153,6 +166,30 @@ public class AccountController : ControllerBase
             RefreshToken = refreshToken.RefreshToken,
         };
         return Ok(res);
+    }
+
+    private async Task<IdentityResult> EnsureClientRoleAssignedAsync(AppUser appUser)
+    {
+        var roleExists = await _roleManager.RoleExistsAsync(ClientRoleName);
+        if (!roleExists)
+        {
+            var createRoleResult = await _roleManager.CreateAsync(new AppRole
+            {
+                Name = ClientRoleName
+            });
+
+            if (!createRoleResult.Succeeded)
+            {
+                return createRoleResult;
+            }
+        }
+
+        if (await _userManager.IsInRoleAsync(appUser, ClientRoleName))
+        {
+            return IdentityResult.Success;
+        }
+
+        return await _userManager.AddToRoleAsync(appUser, ClientRoleName);
     }
 
 
