@@ -16,7 +16,7 @@
               <dd class="col-sm-8">{{ order.workshopName }}</dd>
               <dt class="col-sm-4">Current Status</dt>
               <dd class="col-sm-8">
-                <span :class="statusBadge(order.status)" class="badge">{{ order.status }}</span>
+                <span :class="statusBadge(order.status)" class="badge">{{ statusLabel(order.status) }}</span>
               </dd>
             </dl>
 
@@ -24,7 +24,9 @@
               <label class="form-label fw-bold">New Status</label>
               <select v-model="newStatus" class="form-select">
                 <option value="Pending">Pending</option>
+                <option value="Accepted">Accepted</option>
                 <option value="InProgress">In Progress</option>
+                <option value="WaitingForParts">Waiting for parts</option>
                 <option value="Completed">Completed</option>
                 <option value="Cancelled">Cancelled</option>
               </select>
@@ -93,10 +95,25 @@ async function handleSubmit() {
   }
 }
 
+const statusLabels: Record<string, string> = {
+  'Pending': 'Pending',
+  'Accepted': 'Accepted',
+  'InProgress': 'In Progress',
+  'WaitingForParts': 'Waiting for parts',
+  'Completed': 'Completed',
+  'Cancelled': 'Cancelled'
+}
+
+function statusLabel(status: string): string {
+  return statusLabels[status] || status
+}
+
 function statusBadge(status: string): string {
   const map: Record<string, string> = {
     'Pending': 'bg-secondary',
+    'Accepted': 'bg-info text-dark',
     'InProgress': 'bg-primary',
+    'WaitingForParts': 'bg-warning text-dark',
     'Completed': 'bg-success',
     'Cancelled': 'bg-danger'
   }
