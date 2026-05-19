@@ -92,6 +92,87 @@
         </div>
       </div>
 
+      <!-- Services section -->
+      <div class="card shadow-sm mb-4">
+        <div class="card-header">
+          <h5 class="mb-0">🔧 {{ t('orders.services') }}</h5>
+        </div>
+        <div class="card-body">
+          <div v-if="!order.services || order.services.length === 0" class="text-muted">
+            <em>{{ order.description ? t('orders.otherSeeDescription') : t('orders.noServicesSelected') }}</em>
+          </div>
+          <ul v-else class="list-unstyled mb-0">
+            <li v-for="service in order.services" :key="service.id" class="mb-2">
+              <span class="fw-semibold">{{ service.name }}</span>
+              <span class="text-muted">
+                — €{{ service.basePrice.toFixed(2) }}
+                <span v-if="service.estimatedTimeMinutes">
+                  — {{ formatServiceTime(service.estimatedTimeMinutes) }}
+                </span>
+              </span>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Spare parts section -->
+      <div class="card shadow-sm mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">🧩 {{ t('orderParts.title') }}</h5>
+        </div>
+        <div class="card-body">
+          <div v-if="orderPartsError" class="alert alert-danger">{{ orderPartsError }}</div>
+
+          <div v-if="canAddOrderPart" class="row g-2 mb-3">
+            <div class="col-md-4">
+              <select v-model="orderPartForm.sparePartId" class="form-select" @change="onSparePartChange">
+                <option value="">{{ t('orderParts.sparePart') }}</option>
+                <option v-for="sp in sparePartsCatalog" :key="sp.id" :value="sp.id">{{ sp.name }} (€{{ sp.price.toFixed(2) }})</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <input v-model.number="orderPartForm.quantity" type="number" min="1" class="form-control" :placeholder="t('orderParts.quantity')" />
+            </div>
+            <div class="col-md-2">
+              <input v-model.number="orderPartForm.price" type="number" min="0" step="0.01" class="form-control" :placeholder="t('orderParts.price')" />
+            </div>
+            <div class="col-md-4 d-flex gap-2">
+              <button class="btn btn-primary" @click="saveOrderPart">{{ editingOrderPartId ? t('orderParts.edit') : t('orderParts.add') }}</button>
+              <button class="btn btn-outline-secondary" @click="resetOrderPartForm">{{ t('spareParts.cancel') }}</button>
+            </div>
+          </div>
+
+          <div v-if="orderParts.length === 0" class="text-muted">{{ t('orderParts.noParts') }}</div>
+          <div v-else class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead>
+              <tr>
+                <th>{{ t('orderParts.name') }}</th>
+                <th>{{ t('orderParts.partNumber') }}</th>
+                <th>{{ t('orderParts.quantity') }}</th>
+                <th>{{ t('orderParts.price') }}</th>
+                <th>{{ t('orderParts.total') }}</th>
+                <th v-if="canEditOrderPart || canDeleteOrderPart" class="text-end">{{ t('common.actions') }}</th>
+              </tr>
+              </thead>
+              <tbody>
+              <tr v-for="p in orderParts" :key="p.id">
+                <td>{{ p.sparePartName }}</td>
+                <td>{{ p.sparePartPartNumber || '-' }}</td>
+                <td>{{ p.quantity }}</td>
+                <td>€{{ p.price.toFixed(2) }}</td>
+                <td>€{{ p.lineTotal.toFixed(2) }}</td>
+                <td v-if="canEditOrderPart || canDeleteOrderPart" class="text-end">
+                  <button v-if="canEditOrderPart" class="btn btn-sm btn-outline-primary me-2" @click="startEditOrderPart(p)">{{ t('orderParts.edit') }}</button>
+                  <button v-if="canDeleteOrderPart" class="btn btn-sm btn-outline-danger" @click="deleteOrderPart(p.id)">{{ t('orderParts.delete') }}</button>
+                </td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <!-- Photos section -->
       <div class="card shadow-sm">
         <div class="card-header d-flex justify-content-between align-items-center">
@@ -262,8 +343,10 @@ import { useI18n } from 'vue-i18n'
 import { orderService } from '@/services/orderService'
 import { paymentService } from '@/services/paymentService'
 import { repairPhotoService } from '@/services/repairPhotoService'
+import { sparePartService } from '@/services/sparePartService'
+import { serviceOrderPartService } from '@/services/serviceOrderPartService'
 import { useAuthStore } from '@/stores/auth'
-import type { ServiceOrderDto, PaymentDto, RepairPhotoDto } from '@/types'
+import type { ServiceOrderDto, PaymentDto, RepairPhotoDto, SparePartDto, ServiceOrderPartDto } from '@/types'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -278,6 +361,11 @@ const paymentsLoading = ref(true)
 
 const photos = ref<RepairPhotoDto[]>([])
 const photosLoading = ref(true)
+const sparePartsCatalog = ref<SparePartDto[]>([])
+const orderParts = ref<ServiceOrderPartDto[]>([])
+const orderPartsError = ref('')
+const editingOrderPartId = ref<string | null>(null)
+const orderPartForm = ref({ sparePartId: '', quantity: 1, price: 0 })
 
 // Invoice modal state
 const showInvoiceModal = ref(false)
@@ -301,6 +389,9 @@ const orderId = route.params.id as string
 
 // Can current user upload/delete photos?
 const canUpload = computed(() => authStore.isAdmin || authStore.isMechanic)
+const canAddOrderPart = computed(() => authStore.isAdmin)
+const canEditOrderPart = computed(() => authStore.isAdmin || authStore.isMechanic)
+const canDeleteOrderPart = computed(() => authStore.isAdmin)
 
 onMounted(async () => {
   try {
@@ -311,8 +402,88 @@ onMounted(async () => {
     loading.value = false
   }
 
-  await Promise.all([loadPayments(), loadPhotos()])
+  await Promise.all([loadPayments(), loadPhotos(), loadOrderParts()])
+  if (authStore.isAdmin) {
+    await loadSparePartsCatalog()
+  }
 })
+
+async function loadSparePartsCatalog() {
+  try {
+    sparePartsCatalog.value = await sparePartService.getAll()
+  } catch {
+    // non-critical
+  }
+}
+
+async function loadOrderParts() {
+  try {
+    orderPartsError.value = ''
+    orderParts.value = await serviceOrderPartService.getByOrder(orderId)
+  } catch (err: any) {
+    if (err?.response?.status === 403) {
+      orderPartsError.value = t('orderParts.noPermission')
+      return
+    }
+    orderPartsError.value = t('orderParts.failedLoad')
+  }
+}
+
+function onSparePartChange() {
+  const sp = sparePartsCatalog.value.find(x => x.id === orderPartForm.value.sparePartId)
+  if (sp && (!orderPartForm.value.price || orderPartForm.value.price <= 0)) {
+    orderPartForm.value.price = sp.price
+  }
+}
+
+function startEditOrderPart(p: ServiceOrderPartDto) {
+  editingOrderPartId.value = p.id
+  orderPartForm.value = {
+    sparePartId: p.sparePartId,
+    quantity: p.quantity,
+    price: p.price
+  }
+}
+
+function resetOrderPartForm() {
+  editingOrderPartId.value = null
+  orderPartForm.value = { sparePartId: '', quantity: 1, price: 0 }
+}
+
+async function saveOrderPart() {
+  if ((!canAddOrderPart.value && !canEditOrderPart.value) || !orderPartForm.value.sparePartId) return
+  try {
+    const dto = {
+      serviceOrderId: orderId,
+      sparePartId: orderPartForm.value.sparePartId,
+      quantity: orderPartForm.value.quantity,
+      price: orderPartForm.value.price
+    }
+    if (editingOrderPartId.value) {
+      await serviceOrderPartService.update(editingOrderPartId.value, dto)
+    } else {
+      await serviceOrderPartService.create(dto)
+    }
+    await Promise.all([loadOrderParts(), refreshOrder()])
+    resetOrderPartForm()
+  } catch {
+    orderPartsError.value = t('spareParts.errorSave')
+  }
+}
+
+async function deleteOrderPart(id: string) {
+  if (!authStore.isAdmin || !confirm(t('orderParts.confirmDelete'))) return
+  try {
+    await serviceOrderPartService.delete(id)
+    await Promise.all([loadOrderParts(), refreshOrder()])
+  } catch {
+    orderPartsError.value = t('spareParts.errorDelete')
+  }
+}
+
+async function refreshOrder() {
+  order.value = await orderService.getById(orderId)
+}
 
 async function loadPayments() {
   paymentsLoading.value = true
@@ -471,6 +642,13 @@ function statusBadge2(status: string): string {
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString()
+}
+
+function formatServiceTime(minutes: number): string {
+  if (minutes < 60) return `${minutes} min`
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  return m > 0 ? `${h} h ${m} min` : `${h} h`
 }
 </script>
 

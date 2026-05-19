@@ -12,4 +12,6 @@ public class ServiceOrderCreateDto
 
     [Required]
     public Guid WorkshopId { get; set; }
+
+    public List<Guid>? ServiceIds { get; set; }
 }

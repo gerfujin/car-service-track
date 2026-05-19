@@ -11,6 +11,9 @@ public class SparePart : BaseEntity
     [MaxLength(64)]
     public string? PartNumber { get; set; }
 
+    [MaxLength(64)]
+    public string? Country { get; set; }
+
     public decimal UnitPrice { get; set; }
 
     public int StockQuantity { get; set; }

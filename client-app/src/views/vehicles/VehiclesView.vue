@@ -8,6 +8,11 @@
       </router-link>
     </div>
 
+    <div v-if="deleteError" class="alert alert-danger alert-dismissible mb-3" role="alert">
+      {{ deleteError }}
+      <button type="button" class="btn-close" @click="deleteError = ''"></button>
+    </div>
+
     <div v-if="loading" class="text-center py-5">
       <div class="spinner-border"></div>
     </div>
@@ -54,6 +59,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import axios from 'axios'
 import { vehicleService } from '@/services/vehicleService'
 import { useAuthStore } from '@/stores/auth'
 import type { VehicleDto } from '@/types'
@@ -63,6 +69,7 @@ const authStore = useAuthStore()
 const vehicles = ref<VehicleDto[]>([])
 const loading = ref(true)
 const error = ref('')
+const deleteError = ref('')
 
 onMounted(async () => {
   try {
@@ -76,11 +83,16 @@ onMounted(async () => {
 
 async function deleteVehicle(id: string) {
   if (!confirm(t('vehicles.confirmDelete'))) return
+  deleteError.value = ''
   try {
     await vehicleService.delete(id)
     vehicles.value = vehicles.value.filter(v => v.id !== id)
-  } catch {
-    alert(t('common.error'))
+  } catch (err) {
+    if (axios.isAxiosError(err) && err.response?.status === 400) {
+      deleteError.value = err.response.data?.message ?? t('vehicles.cannotDeleteVehicleWithOrders')
+    } else {
+      deleteError.value = t('common.error')
+    }
   }
 }
 </script>

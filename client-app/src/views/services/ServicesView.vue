@@ -32,9 +32,29 @@
             <p class="mb-1"><strong>{{ t('services.basePrice') }}:</strong> €{{ s.basePrice.toFixed(2) }}</p>
             <p class="mb-0"><strong>{{ t('services.estimatedTime') }}:</strong> {{ formatTime(s.estimatedTimeMinutes) }}</p>
           </div>
-          <div v-if="authStore.isAdmin" class="card-footer d-flex gap-2">
+          <div class="card-footer d-flex gap-2">
+            <button class="btn btn-sm btn-outline-secondary" @click="openDetails(s)">{{ t('common.view') }}</button>
+            <template v-if="authStore.isAdmin">
             <button class="btn btn-sm btn-outline-primary" @click="openEdit(s)">{{ t('services.edit') }}</button>
             <button class="btn btn-sm btn-outline-danger ms-auto" @click="removeService(s.id)">{{ t('services.delete') }}</button>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="showDetails && selectedService" class="modal d-block" tabindex="-1" style="background: rgba(0,0,0,0.5)">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">{{ t('services.details') }}</h5>
+            <button type="button" class="btn-close" @click="closeDetails"></button>
+          </div>
+          <div class="modal-body">
+            <p class="mb-2"><strong>{{ t('services.name') }}:</strong> {{ selectedService.name }}</p>
+            <p class="mb-2"><strong>{{ t('services.description') }}:</strong> {{ selectedService.description || '-' }}</p>
+            <p class="mb-2"><strong>{{ t('services.basePrice') }}:</strong> €{{ selectedService.basePrice.toFixed(2) }}</p>
+            <p class="mb-0"><strong>{{ t('services.estimatedTime') }}:</strong> {{ formatTime(selectedService.estimatedTimeMinutes) }}</p>
           </div>
         </div>
       </div>
@@ -105,6 +125,8 @@ const form = ref<ServiceUpsertDto>({
   basePrice: 0,
   estimatedTimeMinutes: 0
 })
+const showDetails = ref(false)
+const selectedService = ref<ServiceDto | null>(null)
 
 onMounted(async () => {
   await loadServices()
@@ -142,6 +164,16 @@ function openEdit(service: ServiceDto) {
 
 function closeForm() {
   showForm.value = false
+}
+
+function openDetails(service: ServiceDto) {
+  selectedService.value = service
+  showDetails.value = true
+}
+
+function closeDetails() {
+  showDetails.value = false
+  selectedService.value = null
 }
 
 function validateForm(): string | null {

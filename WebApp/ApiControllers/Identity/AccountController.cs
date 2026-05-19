@@ -292,7 +292,7 @@ public class AccountController : ControllerBase
                 );
             }
         }
-        catch (Exception e)
+        catch (Exception)
         {
             return BadRequest(new RestApiErrorResponse()
                 {

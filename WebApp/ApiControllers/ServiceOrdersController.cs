@@ -2,6 +2,7 @@ using App.DAL.EF;
 using App.Domain;
 using App.Domain.Enums;
 using App.DTO.v1;
+using App.DTO.v1.Service;
 using App.DTO.v1.ServiceOrder;
 using Asp.Versioning;
 using Base.Helpers;
@@ -108,7 +109,8 @@ public class ServiceOrdersController : ControllerBase
             .Include(so => so.Vehicle)
             .Include(so => so.Workshop)
             .Include(so => so.Mechanic)
-            .Include(so => so.ServiceOrderItems)
+            .Include(so => so.ServiceOrderItems!)
+                .ThenInclude(item => item.Service)
             .Include(so => so.ServiceOrderParts)
             .Where(so => so.Id == id);
 
@@ -139,7 +141,19 @@ public class ServiceOrdersController : ControllerBase
                     (so.ServiceOrderParts != null
                     ? so.ServiceOrderParts.Sum(p => p.Quantity * p.UnitPrice)
                     : 0),
-                FinalPrice = so.FinalPrice
+                FinalPrice = so.FinalPrice,
+                Services = so.ServiceOrderItems != null
+                    ? so.ServiceOrderItems
+                        .Where(item => item.Service != null)
+                        .Select(item => new ServiceDto
+                        {
+                            Id = item.Service!.Id,
+                            Name = item.Service!.Name.ToString() ?? string.Empty,
+                            Description = item.Service!.Description != null ? item.Service!.Description.ToString() : null,
+                            BasePrice = item.Service!.BasePrice,
+                            EstimatedTimeMinutes = item.Service!.EstimatedTimeMinutes
+                        }).ToList()
+                    : new List<ServiceDto>()
             })
             .FirstOrDefaultAsync();
 
@@ -224,6 +238,26 @@ public class ServiceOrdersController : ControllerBase
         };
 
         _context.ServiceOrders.Add(order);
+
+        // Add selected services as ServiceOrderItems
+        if (dto.ServiceIds != null && dto.ServiceIds.Any())
+        {
+            var services = await _context.Services
+                .Where(s => dto.ServiceIds.Contains(s.Id))
+                .ToListAsync();
+
+            foreach (var service in services)
+            {
+                var serviceItem = new ServiceOrderItem
+                {
+                    ServiceOrderId = order.Id,
+                    ServiceId = service.Id,
+                    Quantity = 1,
+                    UnitPrice = service.BasePrice
+                };
+                _context.ServiceOrderItems.Add(serviceItem);
+            }
+        }
 
         var statusHistory = new ServiceOrderStatusHistory
         {

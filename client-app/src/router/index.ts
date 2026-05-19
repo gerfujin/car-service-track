@@ -100,6 +100,12 @@ const router = createRouter({
       component: () => import('@/views/payments/PaymentDetailView.vue'),
       meta: { requiresAuth: true }
     },
+    {
+      path: '/admin/spare-parts',
+      name: 'admin-spare-parts',
+      component: () => import('@/views/AdminSparePartsView.vue'),
+      meta: { requiresAuth: true, roles: ['admin'] }
+    },
     // Catch-all
     {
       path: '/:pathMatch(.*)*',

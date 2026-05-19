@@ -1,4 +1,5 @@
 using App.Domain.Enums;
+using App.DTO.v1.Service;
 
 namespace App.DTO.v1.ServiceOrder;
 
@@ -19,4 +20,5 @@ public class ServiceOrderDto
     public decimal TotalAmount { get; set; }
     /// <summary>Admin-set final price. When set, overrides the calculated TotalAmount.</summary>
     public decimal? FinalPrice { get; set; }
+    public List<ServiceDto>? Services { get; set; }
 }

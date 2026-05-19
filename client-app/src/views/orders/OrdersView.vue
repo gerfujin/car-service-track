@@ -11,9 +11,53 @@
     <div v-if="loading" class="text-center py-5"><div class="spinner-border"></div></div>
     <div v-else-if="error" class="alert alert-danger">{{ error }}</div>
     <div v-else-if="orders.length === 0" class="alert alert-info">{{ t('orders.noOrders') }}</div>
-    <div v-else class="card shadow-sm">
-      <div class="card-body p-0">
-        <table class="table table-hover mb-0">
+    <div v-else>
+      <div class="bg-light rounded p-3 mb-3">
+        <div class="row g-2 align-items-end">
+          <div class="col-md-3">
+            <label class="form-label">{{ t('orders.filterByStatus') }}</label>
+            <select v-model="filterStatus" class="form-select">
+              <option value="">{{ t('orders.allStatuses') }}</option>
+              <option value="Pending">Pending</option>
+              <option value="InProgress">InProgress</option>
+              <option value="Completed">Completed</option>
+              <option value="Cancelled">Cancelled</option>
+            </select>
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label">{{ t('orders.filterByWorkshop') }}</label>
+            <select v-model="filterWorkshop" class="form-select">
+              <option value="">{{ t('orders.allWorkshops') }}</option>
+              <option v-for="workshop in workshops" :key="workshop.id" :value="workshop.id">
+                {{ workshop.name }}
+              </option>
+            </select>
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label">{{ t('orders.filterByLicensePlate') }}</label>
+            <input
+              v-model="filterLicensePlate"
+              type="text"
+              class="form-control"
+              :placeholder="t('orders.licensePlatePlaceholder')"
+            />
+          </div>
+
+          <div class="col-md-3">
+            <button class="btn btn-outline-secondary w-100" @click="clearFilters">
+              {{ t('orders.clearFilters') }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="filteredOrders.length === 0" class="alert alert-info">{{ t('orders.noOrdersMatchFilter') }}</div>
+
+      <div v-else class="card shadow-sm">
+        <div class="card-body p-0">
+          <table class="table table-hover mb-0">
           <thead class="table-dark">
             <tr>
               <th>{{ t('orders.vehicle') }}</th>
@@ -25,7 +69,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="order in orders" :key="order.id">
+            <tr v-for="order in filteredOrders" :key="order.id">
               <td>{{ order.vehicleDisplay }}</td>
               <td>{{ order.workshopName }}</td>
               <td>
@@ -48,33 +92,60 @@
             </tr>
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { orderService } from '@/services/orderService'
+import { workshopService } from '@/services/workshopService'
 import { useAuthStore } from '@/stores/auth'
-import type { ServiceOrderDto } from '@/types'
+import type { ServiceOrderDto, WorkshopDto } from '@/types'
 
 const { t } = useI18n()
 const authStore = useAuthStore()
 const orders = ref<ServiceOrderDto[]>([])
+const workshops = ref<WorkshopDto[]>([])
 const loading = ref(true)
 const error = ref('')
+const filterStatus = ref('')
+const filterWorkshop = ref('')
+const filterLicensePlate = ref('')
 
 onMounted(async () => {
   try {
     orders.value = await orderService.getAll()
+    workshops.value = await workshopService.getAll()
   } catch {
     error.value = t('common.error')
   } finally {
     loading.value = false
   }
 })
+
+const filteredOrders = computed(() => {
+  return orders.value.filter(order => {
+    if (filterStatus.value && order.status !== filterStatus.value) return false
+    if (filterWorkshop.value && order.workshopId !== filterWorkshop.value) return false
+    if (filterLicensePlate.value.trim()) {
+      const search = filterLicensePlate.value.trim().toLowerCase()
+      const vehicleDisplay = (order.vehicleDisplay ?? '').toLowerCase()
+      if (!vehicleDisplay.includes(search)) return false
+    }
+
+    return true
+  })
+})
+
+function clearFilters() {
+  filterStatus.value = ''
+  filterWorkshop.value = ''
+  filterLicensePlate.value = ''
+}
 
 function statusBadge(status: string): string {
   const map: Record<string, string> = {

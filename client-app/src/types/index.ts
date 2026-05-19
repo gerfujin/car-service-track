@@ -57,6 +57,59 @@ export interface ServiceDto {
   estimatedTimeMinutes: number
 }
 
+export interface SparePartDto {
+  id: string
+  name: string
+  partNumber?: string
+  manufacturer?: string
+  price: number
+  country?: string
+  stockQuantity: number
+}
+
+export interface SparePartCreateDto {
+  name: string
+  partNumber?: string
+  manufacturer?: string
+  price: number
+  country?: string
+  stockQuantity: number
+}
+
+export interface SparePartUpdateDto {
+  name: string
+  partNumber?: string
+  manufacturer?: string
+  price: number
+  country?: string
+  stockQuantity: number
+}
+
+export interface ServiceOrderPartDto {
+  id: string
+  serviceOrderId: string
+  sparePartId: string
+  sparePartName?: string
+  sparePartPartNumber?: string
+  quantity: number
+  price: number
+  lineTotal: number
+}
+
+export interface ServiceOrderPartCreateDto {
+  quantity: number
+  price: number
+  sparePartId: string
+  serviceOrderId: string
+}
+
+export interface ServiceOrderPartUpdateDto {
+  quantity: number
+  price: number
+  sparePartId: string
+  serviceOrderId: string
+}
+
 // Service Order types
 export interface ServiceOrderDto {
   id: string
@@ -71,12 +124,15 @@ export interface ServiceOrderDto {
   mechanicId?: string
   mechanicName?: string
   totalAmount: number
+  finalPrice?: number
+  services?: ServiceDto[]
 }
 
 export interface ServiceOrderCreateDto {
   vehicleId: string
   workshopId: string
   description?: string
+  serviceIds?: string[]
 }
 
 export interface StatusHistoryEntry {

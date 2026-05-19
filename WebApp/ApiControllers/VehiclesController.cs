@@ -235,6 +235,7 @@ public class VehiclesController : ControllerBase
     [HttpDelete("{id:guid}")]
     [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = "admin,client")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> DeleteVehicle(Guid id)
@@ -251,8 +252,19 @@ public class VehiclesController : ControllerBase
         var vehicle = await query.FirstOrDefaultAsync();
         if (vehicle == null) return NotFound();
 
-        _context.Vehicles.Remove(vehicle);
-        await _context.SaveChangesAsync();
+        var hasOrders = await _context.ServiceOrders.AnyAsync(so => so.VehicleId == id);
+        if (hasOrders)
+            return BadRequest(new { message = "Cannot delete vehicle with existing service orders." });
+
+        try
+        {
+            _context.Vehicles.Remove(vehicle);
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            return BadRequest(new { message = "Cannot delete this vehicle. It may have related records." });
+        }
 
         return NoContent();
     }

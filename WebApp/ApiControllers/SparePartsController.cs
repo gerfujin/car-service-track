@@ -1,5 +1,6 @@
 using App.DAL.EF;
 using App.Domain;
+using App.DTO.v1;
 using App.DTO.v1.SparePart;
 using Asp.Versioning;
 using Base.Domain;
@@ -13,6 +14,7 @@ namespace WebApp.ApiControllers;
 [ApiVersion("1.0")]
 [ApiController]
 [Route("/api/v{version:apiVersion}/[controller]")]
+[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
 public class SparePartsController : ControllerBase
 {
     private readonly AppDbContext _context;
@@ -22,8 +24,9 @@ public class SparePartsController : ControllerBase
         _context = context;
     }
 
-    /// <summary>Get all spare parts (public)</summary>
+    /// <summary>Get all spare parts (admin only)</summary>
     [HttpGet]
+    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = "admin,mechanic")]
     [Produces("application/json")]
     [ProducesResponseType<IEnumerable<SparePartDto>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<SparePartDto>>> GetSpareParts()
@@ -34,15 +37,18 @@ public class SparePartsController : ControllerBase
             Id = sp.Id,
             Name = sp.Name.Translate() ?? sp.Name.ToString() ?? "",
             PartNumber = sp.PartNumber,
-            UnitPrice = sp.UnitPrice,
+            Manufacturer = sp.PartNumber,
+            Price = sp.UnitPrice,
+            Country = sp.Country,
             StockQuantity = sp.StockQuantity
         }).ToList();
 
         return Ok(parts);
     }
 
-    /// <summary>Get a specific spare part (public)</summary>
+    /// <summary>Get a specific spare part (admin only)</summary>
     [HttpGet("{id:guid}")]
+    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = "admin,mechanic")]
     [Produces("application/json")]
     [ProducesResponseType<SparePartDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -59,7 +65,9 @@ public class SparePartsController : ControllerBase
             Id = entity.Id,
             Name = entity.Name.Translate() ?? entity.Name.ToString() ?? "",
             PartNumber = entity.PartNumber,
-            UnitPrice = entity.UnitPrice,
+            Manufacturer = entity.PartNumber,
+            Price = entity.UnitPrice,
+            Country = entity.Country,
             StockQuantity = entity.StockQuantity
         };
 
@@ -72,21 +80,41 @@ public class SparePartsController : ControllerBase
     [Produces("application/json")]
     [Consumes("application/json")]
     [ProducesResponseType<SparePartDto>(StatusCodes.Status201Created)]
-    public async Task<ActionResult<SparePartDto>> CreateSparePart([FromBody] SparePartDto dto)
+    [ProducesResponseType<RestApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<SparePartDto>> CreateSparePart([FromBody] SparePartCreateDto dto)
     {
+        if (string.IsNullOrWhiteSpace(dto.Name))
+        {
+            return BadRequest(new RestApiErrorResponse
+            {
+                Status = System.Net.HttpStatusCode.BadRequest,
+                Error = "Name is required."
+            });
+        }
+
         var part = new SparePart
         {
-            Name = new LangStr(dto.Name ?? ""),
-            PartNumber = dto.PartNumber,
-            UnitPrice = dto.UnitPrice,
+            Name = new LangStr(dto.Name),
+            PartNumber = dto.Manufacturer,
+            Country = dto.Country,
+            UnitPrice = dto.Price,
             StockQuantity = dto.StockQuantity
         };
 
         _context.SpareParts.Add(part);
         await _context.SaveChangesAsync();
 
-        dto.Id = part.Id;
-        return CreatedAtAction(nameof(GetSparePart), new { id = part.Id }, dto);
+        var result = new SparePartDto
+        {
+            Id = part.Id,
+            Name = part.Name.Translate() ?? part.Name.ToString() ?? "",
+            Manufacturer = part.PartNumber,
+            Price = part.UnitPrice,
+            Country = dto.Country,
+            StockQuantity = part.StockQuantity
+        };
+
+        return CreatedAtAction(nameof(GetSparePart), new { id = part.Id }, result);
     }
 
     /// <summary>Update a spare part (admin only)</summary>
@@ -94,14 +122,25 @@ public class SparePartsController : ControllerBase
     [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = "admin")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> UpdateSparePart(Guid id, [FromBody] SparePartDto dto)
+    [ProducesResponseType<RestApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> UpdateSparePart(Guid id, [FromBody] SparePartUpdateDto dto)
     {
+        if (string.IsNullOrWhiteSpace(dto.Name))
+        {
+            return BadRequest(new RestApiErrorResponse
+            {
+                Status = System.Net.HttpStatusCode.BadRequest,
+                Error = "Name is required."
+            });
+        }
+
         var part = await _context.SpareParts.FindAsync(id);
         if (part == null) return NotFound();
 
-        part.Name = new LangStr(dto.Name ?? "");
-        part.PartNumber = dto.PartNumber;
-        part.UnitPrice = dto.UnitPrice;
+        part.Name = new LangStr(dto.Name);
+        part.PartNumber = dto.Manufacturer;
+        part.Country = dto.Country;
+        part.UnitPrice = dto.Price;
         part.StockQuantity = dto.StockQuantity;
         part.UpdatedAt = DateTime.UtcNow;
 

@@ -1,0 +1,48 @@
+@model WebApp.Areas.Admin.ViewModels.ServiceOrderPartAdminListViewModel
+@{
+    ViewData["Title"] = "Service Order Parts";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>🧩 Service Order Parts</h2>
+    <a asp-action="Create" asp-route-serviceOrderId="@Model.ServiceOrderId" class="btn btn-primary">+ Add Spare Part</a>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead class="table-dark">
+            <tr>
+                <th>Order</th>
+                <th>Spare Part</th>
+                <th>Quantity</th>
+                <th>Price</th>
+                <th class="text-end">Actions</th>
+            </tr>
+            </thead>
+            <tbody>
+            @if (!Model.Parts.Any())
+            {
+                <tr><td colspan="5" class="text-center text-muted py-4">No order parts found.</td></tr>
+            }
+            else
+            {
+                @foreach (var p in Model.Parts)
+                {
+                    <tr>
+                        <td><code>@p.ServiceOrderId</code></td>
+                        <td>@p.SparePartName</td>
+                        <td>@p.Quantity</td>
+                        <td>€@p.Price.ToString("F2")</td>
+                        <td class="text-end">
+                            <a asp-action="Details" asp-route-id="@p.Id" class="btn btn-sm btn-outline-info">Details</a>
+                            <a asp-action="Edit" asp-route-id="@p.Id" class="btn btn-sm btn-outline-primary">Edit</a>
+                            <a asp-action="Delete" asp-route-id="@p.Id" class="btn btn-sm btn-outline-danger">Delete</a>
+                        </td>
+                    </tr>
+                }
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
