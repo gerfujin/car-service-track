@@ -25,10 +25,7 @@ export const tokenStorage = {
 }
 
 const apiClient: AxiosInstance = axios.create({
-  baseURL: API_V1,
-  headers: {
-    'Content-Type': 'application/json'
-  }
+  baseURL: API_V1
 })
 
 let isRefreshing = false

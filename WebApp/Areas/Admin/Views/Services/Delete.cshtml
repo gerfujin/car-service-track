@@ -19,6 +19,8 @@
             <dd class="col-sm-8">@Model.Name</dd>
             <dt class="col-sm-4">Base Price</dt>
             <dd class="col-sm-8">€@Model.BasePrice.ToString("F2")</dd>
+            <dt class="col-sm-4">Estimated Time</dt>
+            <dd class="col-sm-8">@Model.EstimatedTimeMinutes min</dd>
         </dl>
         <form asp-action="Delete" method="post">
             <input type="hidden" asp-for="Id" />

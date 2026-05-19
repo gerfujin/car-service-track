@@ -22,6 +22,9 @@
             <li class="nav-item">
               <router-link class="nav-link" to="/orders">📋 {{ t('nav.orders') }}</router-link>
             </li>
+            <li class="nav-item">
+              <router-link class="nav-link" to="/services">🔩 {{ t('nav.services') }}</router-link>
+            </li>
             <!-- Payments: all roles -->
             <li class="nav-item">
               <router-link class="nav-link" to="/payments">💰 {{ t('nav.payments') }}</router-link>

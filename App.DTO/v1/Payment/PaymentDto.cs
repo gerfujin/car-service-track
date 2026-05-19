@@ -12,5 +12,10 @@ public class PaymentDto
     public string? PaymentMethod { get; set; }
     public string? Notes { get; set; }
     public Guid ServiceOrderId { get; set; }
+    public Guid? OwnerId { get; set; }
     public DateTime CreatedAt { get; set; }
+
+    // Nested convenience fields
+    public string? VehicleInfo { get; set; }   // "Make Model (LicensePlate)"
+    public string? WorkshopName { get; set; }
 }

@@ -1,9 +1,11 @@
 import apiClient from './api'
-import type { PaymentDto } from '@/types'
+import type { PaymentDto, PaymentCreateDto } from '@/types'
 
 export const paymentService = {
-  async getAll(): Promise<PaymentDto[]> {
-    const response = await apiClient.get<PaymentDto[]>('/payments')
+  async getAll(filters?: { serviceOrderId?: string }): Promise<PaymentDto[]> {
+    const params: Record<string, string> = {}
+    if (filters?.serviceOrderId) params.serviceOrderId = filters.serviceOrderId
+    const response = await apiClient.get<PaymentDto[]>('/payments', { params })
     return response.data
   },
 
@@ -19,5 +21,14 @@ export const paymentService = {
     } catch {
       return null
     }
+  },
+
+  async create(data: PaymentCreateDto): Promise<PaymentDto> {
+    const response = await apiClient.post<PaymentDto>('/payments', data)
+    return response.data
+  },
+
+  async pay(id: string): Promise<void> {
+    await apiClient.patch(`/payments/${id}/pay`)
   }
 }

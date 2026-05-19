@@ -17,6 +17,11 @@ public class ServiceAdminViewModel
     [Range(0, 99999.99)]
     [Display(Name = "Base Price (€)")]
     public decimal BasePrice { get; set; }
+
+    [Required]
+    [Range(0, int.MaxValue)]
+    [Display(Name = "Estimated Time (minutes)")]
+    public int EstimatedTimeMinutes { get; set; }
 }
 
 public class ServiceAdminListViewModel

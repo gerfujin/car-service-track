@@ -1,0 +1,31 @@
+@model WebApp.Areas.Admin.ViewModels.ServiceAdminViewModel
+@{
+    ViewData["Title"] = "Service Details";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>🔍 Service Details</h2>
+    <a asp-action="Index" class="btn btn-outline-secondary">← Back to List</a>
+</div>
+
+<div class="card shadow-sm" style="max-width: 700px;">
+    <div class="card-body">
+        <dl class="row mb-0">
+            <dt class="col-sm-4">Name</dt>
+            <dd class="col-sm-8">@Model.Name</dd>
+
+            <dt class="col-sm-4">Description</dt>
+            <dd class="col-sm-8">@Model.Description</dd>
+
+            <dt class="col-sm-4">Base Price</dt>
+            <dd class="col-sm-8">€@Model.BasePrice.ToString("F2")</dd>
+
+            <dt class="col-sm-4">Estimated Time</dt>
+            <dd class="col-sm-8">@Model.EstimatedTimeMinutes min</dd>
+        </dl>
+    </div>
+    <div class="card-footer d-flex gap-2">
+        <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary">Edit</a>
+        <a asp-action="Delete" asp-route-id="@Model.Id" class="btn btn-outline-danger">Delete</a>
+    </div>
+</div>

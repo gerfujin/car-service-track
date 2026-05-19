@@ -83,6 +83,12 @@ const router = createRouter({
     },
     // Payments — all authenticated roles
     {
+      path: '/services',
+      name: 'services',
+      component: () => import('@/views/services/ServicesView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
       path: '/payments',
       name: 'payments',
       component: () => import('@/views/payments/PaymentsView.vue'),

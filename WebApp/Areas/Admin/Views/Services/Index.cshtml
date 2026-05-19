@@ -22,6 +22,7 @@ else
                         <th>Service Name</th>
                         <th>Description</th>
                         <th>Base Price</th>
+                        <th>Estimated Time</th>
                         <th class="text-end">Actions</th>
                     </tr>
                 </thead>
@@ -32,7 +33,9 @@ else
                             <td><strong>@s.Name</strong></td>
                             <td class="text-muted">@(s.Description.Length > 60 ? s.Description[..60] + "…" : s.Description)</td>
                             <td>€@s.BasePrice.ToString("F2")</td>
+                            <td>@s.EstimatedTimeMinutes min</td>
                             <td class="text-end">
+                                <a asp-action="Details" asp-route-id="@s.Id" class="btn btn-sm btn-outline-info">Details</a>
                                 <a asp-action="Edit" asp-route-id="@s.Id" class="btn btn-sm btn-outline-primary">Edit</a>
                                 <a asp-action="Delete" asp-route-id="@s.Id" class="btn btn-sm btn-outline-danger">Delete</a>
                             </td>

@@ -190,6 +190,8 @@ app.UseCors("CorsAllowAll");
 
 app.UseRouting();
 
+app.UseStaticFiles(); // Required to serve files from wwwroot (e.g. /uploads/repair-photos/)
+
 app.UseAuthorization();
 
 app.UseSwagger();

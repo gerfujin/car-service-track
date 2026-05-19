@@ -27,7 +27,8 @@ public class ServicesController : Controller
                 Id = s.Id,
                 Name = s.Name.ToString(),
                 Description = s.Description.ToString(),
-                BasePrice = s.BasePrice
+                BasePrice = s.BasePrice,
+                EstimatedTimeMinutes = s.EstimatedTimeMinutes
             })
             .ToListAsync();
 
@@ -49,7 +50,8 @@ public class ServicesController : Controller
         {
             Name = new LangStr(vm.Name),
             Description = new LangStr(vm.Description),
-            BasePrice = vm.BasePrice
+            BasePrice = vm.BasePrice,
+            EstimatedTimeMinutes = vm.EstimatedTimeMinutes
         };
 
         _context.Services.Add(service);
@@ -69,7 +71,8 @@ public class ServicesController : Controller
             Id = service.Id,
             Name = service.Name.ToString(),
             Description = service.Description.ToString(),
-            BasePrice = service.BasePrice
+            BasePrice = service.BasePrice,
+            EstimatedTimeMinutes = service.EstimatedTimeMinutes
         };
 
         return View(vm);
@@ -88,6 +91,7 @@ public class ServicesController : Controller
         service.Name = new LangStr(vm.Name);
         service.Description = new LangStr(vm.Description);
         service.BasePrice = vm.BasePrice;
+        service.EstimatedTimeMinutes = vm.EstimatedTimeMinutes;
         service.UpdatedAt = DateTime.UtcNow;
 
         _context.Entry(service).State = EntityState.Modified;
@@ -107,7 +111,8 @@ public class ServicesController : Controller
             Id = service.Id,
             Name = service.Name.ToString(),
             Description = service.Description.ToString(),
-            BasePrice = service.BasePrice
+            BasePrice = service.BasePrice,
+            EstimatedTimeMinutes = service.EstimatedTimeMinutes
         };
 
         return View(vm);
@@ -125,5 +130,22 @@ public class ServicesController : Controller
 
         TempData["Success"] = "Service deleted successfully.";
         return RedirectToAction(nameof(Index));
+    }
+
+    public async Task<IActionResult> Details(Guid id)
+    {
+        var service = await _context.Services.FindAsync(id);
+        if (service == null) return NotFound();
+
+        var vm = new ServiceAdminViewModel
+        {
+            Id = service.Id,
+            Name = service.Name.ToString(),
+            Description = service.Description.ToString(),
+            BasePrice = service.BasePrice,
+            EstimatedTimeMinutes = service.EstimatedTimeMinutes
+        };
+
+        return View(vm);
     }
 }

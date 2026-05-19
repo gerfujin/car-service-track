@@ -48,6 +48,15 @@ export interface VehicleCreateDto {
   color?: string
 }
 
+// Service types
+export interface ServiceDto {
+  id: string
+  name: string
+  description: string
+  basePrice: number
+  estimatedTimeMinutes: number
+}
+
 // Service Order types
 export interface ServiceOrderDto {
   id: string
@@ -82,11 +91,20 @@ export interface PaymentDto {
   id: string
   amount: number
   status: string
+  statusName: string
   paidAt?: string
   paymentMethod?: string
   notes?: string
   serviceOrderId: string
+  ownerId?: string
   createdAt: string
+  vehicleInfo?: string
+  workshopName?: string
+}
+
+export interface PaymentCreateDto {
+  serviceOrderId: string
+  amount: number
 }
 
 // Workshop types
@@ -107,6 +125,15 @@ export interface MechanicDto {
   phone?: string
   email?: string
   specialization?: string
+}
+
+// Repair Photo types
+export interface RepairPhotoDto {
+  id: string
+  description?: string
+  photoUrl?: string
+  uploadedAt: string
+  serviceOrderId: string
 }
 
 // Error response
