@@ -1,7 +1,8 @@
-using App.DAL.EF;
+using App.BLL;
+using App.DTO.v1.Mechanic;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using WebApp.Mappers;
 
 namespace WebApp.ApiControllers;
 
@@ -10,31 +11,22 @@ namespace WebApp.ApiControllers;
 [Route("/api/v{version:apiVersion}/[controller]")]
 public class MechanicsController : ControllerBase
 {
-    private readonly AppDbContext _context;
+    private readonly IAppBll _bll;
 
-    public MechanicsController(AppDbContext context)
+    public MechanicsController(IAppBll bll)
     {
-        _context = context;
+        _bll = bll;
     }
 
     /// <summary>Get all mechanics (public)</summary>
     [HttpGet]
     [Produces("application/json")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetMechanics()
+    public async Task<ActionResult<IEnumerable<MechanicDto>>> GetMechanics()
     {
-        var mechanics = await _context.Mechanics
-            .Select(m => new
-            {
-                m.Id,
-                m.FirstName,
-                m.LastName,
-                FullName = m.FirstName + " " + m.LastName,
-                m.Phone,
-                m.Email,
-                m.Specialization
-            })
-            .ToListAsync();
+        var mechanics = (await _bll.Mechanics.AllAsync())
+            .Select(MechanicApiMapper.ToApiDto)
+            .ToList();
 
         return Ok(mechanics);
     }
@@ -44,23 +36,11 @@ public class MechanicsController : ControllerBase
     [Produces("application/json")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetMechanic(Guid id)
+    public async Task<ActionResult<MechanicDto>> GetMechanic(Guid id)
     {
-        var mechanic = await _context.Mechanics
-            .Where(m => m.Id == id)
-            .Select(m => new
-            {
-                m.Id,
-                m.FirstName,
-                m.LastName,
-                FullName = m.FirstName + " " + m.LastName,
-                m.Phone,
-                m.Email,
-                m.Specialization
-            })
-            .FirstOrDefaultAsync();
+        var mechanic = await _bll.Mechanics.FindAsync(id);
 
         if (mechanic == null) return NotFound();
-        return Ok(mechanic);
+        return Ok(MechanicApiMapper.ToApiDto(mechanic));
     }
 }

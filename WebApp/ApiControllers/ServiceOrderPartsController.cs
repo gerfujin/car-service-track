@@ -1,5 +1,4 @@
-using App.DAL.EF;
-using App.Domain;
+using App.BLL;
 using App.DTO.v1;
 using App.DTO.v1.ServiceOrderPart;
 using Asp.Versioning;
@@ -7,7 +6,7 @@ using Base.Helpers;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using WebApp.Mappers;
 
 namespace WebApp.ApiControllers;
 
@@ -17,11 +16,11 @@ namespace WebApp.ApiControllers;
 [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
 public class ServiceOrderPartsController : ControllerBase
 {
-    private readonly AppDbContext _context;
+    private readonly IAppBll _bll;
 
-    public ServiceOrderPartsController(AppDbContext context)
+    public ServiceOrderPartsController(IAppBll bll)
     {
-        _context = context;
+        _bll = bll;
     }
 
     private Guid GetCurrentUserId()
@@ -31,51 +30,26 @@ public class ServiceOrderPartsController : ControllerBase
         return userId.Value;
     }
 
-    private async Task<Owner?> GetCurrentOwnerAsync()
-    {
-        var userId = GetCurrentUserId();
-        return await _context.Owners.FirstOrDefaultAsync(o => o.AppUserId == userId);
-    }
-
     private bool IsAdmin() => User.IsInRole("admin");
     private bool IsMechanic() => User.IsInRole("mechanic");
+
+    private static RestApiErrorResponse ErrorResponse(string error) => new()
+    {
+        Status = System.Net.HttpStatusCode.BadRequest,
+        Error = error
+    };
 
     [HttpGet]
     [ProducesResponseType<IEnumerable<ServiceOrderPartDto>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<ServiceOrderPartDto>>> GetServiceOrderParts([FromQuery] Guid? serviceOrderId)
     {
-        var query = _context.ServiceOrderParts
-            .Include(sop => sop.ServiceOrder)
-                .ThenInclude(so => so!.Vehicle)
-            .Include(sop => sop.SparePart)
-            .AsQueryable();
+        var isAdmin = IsAdmin();
+        var isMechanic = IsMechanic();
+        var appUserId = isAdmin || isMechanic ? Guid.Empty : GetCurrentUserId();
 
-        if (serviceOrderId.HasValue)
-        {
-            query = query.Where(sop => sop.ServiceOrderId == serviceOrderId.Value);
-        }
-
-        if (!IsAdmin() && !IsMechanic())
-        {
-            var owner = await GetCurrentOwnerAsync();
-            if (owner == null) return Ok(new List<ServiceOrderPartDto>());
-
-            query = query.Where(sop => sop.ServiceOrder != null && sop.ServiceOrder.Vehicle != null && sop.ServiceOrder.Vehicle.OwnerId == owner.Id);
-        }
-
-        var parts = await query
-            .Select(sop => new ServiceOrderPartDto
-            {
-                Id = sop.Id,
-                ServiceOrderId = sop.ServiceOrderId,
-                SparePartId = sop.SparePartId,
-                SparePartName = sop.SparePart != null ? (sop.SparePart.Name.Translate() ?? sop.SparePart.Name.ToString()) : null,
-                SparePartPartNumber = sop.SparePart != null ? sop.SparePart.PartNumber : null,
-                Quantity = sop.Quantity,
-                Price = sop.UnitPrice,
-                LineTotal = sop.Quantity * sop.UnitPrice
-            })
-            .ToListAsync();
+        var parts = (await _bll.ServiceOrderParts.AllForApiAsync(serviceOrderId, appUserId, isAdmin, isMechanic))
+            .Select(ServiceOrderPartApiMapper.ToApiDto)
+            .ToList();
 
         return Ok(parts);
     }
@@ -85,34 +59,14 @@ public class ServiceOrderPartsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ServiceOrderPartDto>> GetServiceOrderPart(Guid id)
     {
-        var sop = await _context.ServiceOrderParts
-            .Include(x => x.ServiceOrder)
-                .ThenInclude(so => so!.Vehicle)
-            .Include(x => x.SparePart)
-            .FirstOrDefaultAsync(x => x.Id == id);
+        var isAdmin = IsAdmin();
+        var isMechanic = IsMechanic();
+        var appUserId = isAdmin || isMechanic ? Guid.Empty : GetCurrentUserId();
+
+        var sop = await _bll.ServiceOrderParts.FindForApiAsync(id, appUserId, isAdmin, isMechanic);
 
         if (sop == null) return NotFound();
-
-        if (!IsAdmin() && !IsMechanic())
-        {
-            var owner = await GetCurrentOwnerAsync();
-            if (owner == null || sop.ServiceOrder?.Vehicle?.OwnerId != owner.Id)
-            {
-                return NotFound();
-            }
-        }
-
-        return Ok(new ServiceOrderPartDto
-        {
-            Id = sop.Id,
-            ServiceOrderId = sop.ServiceOrderId,
-            SparePartId = sop.SparePartId,
-            SparePartName = sop.SparePart != null ? (sop.SparePart.Name.Translate() ?? sop.SparePart.Name.ToString()) : null,
-            SparePartPartNumber = sop.SparePart != null ? sop.SparePart.PartNumber : null,
-            Quantity = sop.Quantity,
-            Price = sop.UnitPrice,
-            LineTotal = sop.Quantity * sop.UnitPrice
-        });
+        return Ok(ServiceOrderPartApiMapper.ToApiDto(sop));
     }
 
     [HttpPost]
@@ -121,49 +75,23 @@ public class ServiceOrderPartsController : ControllerBase
     [ProducesResponseType<RestApiErrorResponse>(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<ServiceOrderPartDto>> CreateServiceOrderPart([FromBody] ServiceOrderPartCreateDto dto)
     {
-        var order = await _context.ServiceOrders.FindAsync(dto.ServiceOrderId);
-        if (order == null)
+        var result = await _bll.ServiceOrderParts.CreateForApiAsync(ServiceOrderPartApiMapper.ToBll(dto));
+        if (result.Error != null)
         {
-            return BadRequest(new RestApiErrorResponse { Status = System.Net.HttpStatusCode.BadRequest, Error = "Service order not found." });
+            return BadRequest(ErrorResponse(result.Error));
         }
 
-        var sparePart = await _context.SpareParts.FindAsync(dto.SparePartId);
-        if (sparePart == null)
+        await _bll.SaveChangesAsync();
+        if (result.RecalculateServiceOrderId.HasValue)
         {
-            return BadRequest(new RestApiErrorResponse { Status = System.Net.HttpStatusCode.BadRequest, Error = "Spare part not found." });
+            await _bll.ServiceOrderParts.RecalculateOrderTotalAsync(result.RecalculateServiceOrderId.Value);
+            await _bll.SaveChangesAsync();
         }
 
-        if (dto.Quantity <= 0)
-        {
-            return BadRequest(new RestApiErrorResponse { Status = System.Net.HttpStatusCode.BadRequest, Error = "Quantity must be greater than 0." });
-        }
-
-        var effectivePrice = dto.Price <= 0 ? sparePart.UnitPrice : dto.Price;
-        var entity = new ServiceOrderPart
-        {
-            ServiceOrderId = dto.ServiceOrderId,
-            SparePartId = dto.SparePartId,
-            Quantity = dto.Quantity,
-            UnitPrice = effectivePrice
-        };
-
-        _context.ServiceOrderParts.Add(entity);
-        await _context.SaveChangesAsync();
-        await RecalculateOrderTotalAsync(order.Id);
-
-        var result = new ServiceOrderPartDto
-        {
-            Id = entity.Id,
-            ServiceOrderId = entity.ServiceOrderId,
-            SparePartId = entity.SparePartId,
-            SparePartName = sparePart.Name.Translate() ?? sparePart.Name.ToString(),
-            SparePartPartNumber = sparePart.PartNumber,
-            Quantity = entity.Quantity,
-            Price = entity.UnitPrice,
-            LineTotal = entity.Quantity * entity.UnitPrice
-        };
-
-        return CreatedAtAction(nameof(GetServiceOrderPart), new { id = entity.Id }, result);
+        return CreatedAtAction(
+            nameof(GetServiceOrderPart),
+            new { id = result.Entity!.Id },
+            ServiceOrderPartApiMapper.ToApiDto(result.Entity));
     }
 
     [HttpPut("{id:guid}")]
@@ -173,39 +101,19 @@ public class ServiceOrderPartsController : ControllerBase
     [ProducesResponseType<RestApiErrorResponse>(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> UpdateServiceOrderPart(Guid id, [FromBody] ServiceOrderPartUpdateDto dto)
     {
-        var entity = await _context.ServiceOrderParts.FindAsync(id);
-        if (entity == null) return NotFound();
-
-        if (dto.Price < 0)
+        var result = await _bll.ServiceOrderParts.UpdateForApiAsync(id, ServiceOrderPartApiMapper.ToBll(dto, id));
+        if (result.NotFound) return NotFound();
+        if (result.Error != null)
         {
-            return BadRequest(new RestApiErrorResponse { Status = System.Net.HttpStatusCode.BadRequest, Error = "Price must be greater than or equal to 0." });
+            return BadRequest(ErrorResponse(result.Error));
         }
 
-        var order = await _context.ServiceOrders.FindAsync(dto.ServiceOrderId);
-        if (order == null)
+        await _bll.SaveChangesAsync();
+        if (result.RecalculateServiceOrderId.HasValue)
         {
-            return BadRequest(new RestApiErrorResponse { Status = System.Net.HttpStatusCode.BadRequest, Error = "Service order not found." });
+            await _bll.ServiceOrderParts.RecalculateOrderTotalAsync(result.RecalculateServiceOrderId.Value);
+            await _bll.SaveChangesAsync();
         }
-
-        var sparePart = await _context.SpareParts.FindAsync(dto.SparePartId);
-        if (sparePart == null)
-        {
-            return BadRequest(new RestApiErrorResponse { Status = System.Net.HttpStatusCode.BadRequest, Error = "Spare part not found." });
-        }
-
-        if (dto.Quantity <= 0)
-        {
-            return BadRequest(new RestApiErrorResponse { Status = System.Net.HttpStatusCode.BadRequest, Error = "Quantity must be greater than 0." });
-        }
-
-        entity.ServiceOrderId = dto.ServiceOrderId;
-        entity.SparePartId = dto.SparePartId;
-        entity.Quantity = dto.Quantity;
-        entity.UnitPrice = dto.Price <= 0 ? sparePart.UnitPrice : dto.Price;
-
-        _context.Entry(entity).State = EntityState.Modified;
-        await _context.SaveChangesAsync();
-        await RecalculateOrderTotalAsync(entity.ServiceOrderId);
 
         return NoContent();
     }
@@ -216,32 +124,16 @@ public class ServiceOrderPartsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteServiceOrderPart(Guid id)
     {
-        var entity = await _context.ServiceOrderParts.FindAsync(id);
-        if (entity == null) return NotFound();
+        var result = await _bll.ServiceOrderParts.RemoveForApiAsync(id);
+        if (result.NotFound) return NotFound();
 
-        var orderId = entity.ServiceOrderId;
-        _context.ServiceOrderParts.Remove(entity);
-        await _context.SaveChangesAsync();
-        await RecalculateOrderTotalAsync(orderId);
+        await _bll.SaveChangesAsync();
+        if (result.RecalculateServiceOrderId.HasValue)
+        {
+            await _bll.ServiceOrderParts.RecalculateOrderTotalAsync(result.RecalculateServiceOrderId.Value);
+            await _bll.SaveChangesAsync();
+        }
 
         return NoContent();
-    }
-
-    private async Task RecalculateOrderTotalAsync(Guid serviceOrderId)
-    {
-        var order = await _context.ServiceOrders
-            .Include(so => so.ServiceOrderItems)
-            .Include(so => so.ServiceOrderParts)
-            .FirstOrDefaultAsync(so => so.Id == serviceOrderId);
-
-        if (order == null) return;
-
-        var itemsTotal = order.ServiceOrderItems?.Sum(i => i.Quantity * i.UnitPrice) ?? 0;
-        var partsTotal = order.ServiceOrderParts?.Sum(p => p.Quantity * p.UnitPrice) ?? 0;
-        order.FinalPrice = itemsTotal + partsTotal;
-        order.UpdatedAt = DateTime.UtcNow;
-
-        _context.Entry(order).State = EntityState.Modified;
-        await _context.SaveChangesAsync();
     }
 }

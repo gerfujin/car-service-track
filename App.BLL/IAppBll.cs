@@ -12,6 +12,9 @@ public interface IAppBll
     public IStatusHistoryService StatusHistories { get; }
     public IPaymentService Payments { get; }
     public IOwnerService Owners { get; }
+    public IMechanicService Mechanics { get; }
+    public IServiceOrderPartService ServiceOrderParts { get; }
+    public IRepairPhotoService RepairPhotos { get; }
 
     /// <summary>
     /// Persists all staged changes. The services only stage via the repositories;

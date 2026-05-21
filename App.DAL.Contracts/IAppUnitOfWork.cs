@@ -12,4 +12,7 @@ public interface IAppUnitOfWork : IBaseUnitOfWork
     public IServiceOrderStatusHistoryRepository StatusHistories { get; }
     public IPaymentRepository Payments { get; }
     public IOwnerRepository Owners { get; }
+    public IMechanicRepository Mechanics { get; }
+    public IServiceOrderPartRepository ServiceOrderParts { get; }
+    public IRepairPhotoRepository RepairPhotos { get; }
 }

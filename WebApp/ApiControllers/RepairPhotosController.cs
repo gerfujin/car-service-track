@@ -1,5 +1,5 @@
-using App.DAL.EF;
-using App.Domain;
+using App.BLL;
+using App.BLL.DTO;
 using App.DTO.v1;
 using App.DTO.v1.RepairPhoto;
 using Asp.Versioning;
@@ -7,7 +7,7 @@ using Base.Helpers;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using WebApp.Mappers;
 
 namespace WebApp.ApiControllers;
 
@@ -17,12 +17,12 @@ namespace WebApp.ApiControllers;
 [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
 public class RepairPhotosController : ControllerBase
 {
-    private readonly AppDbContext _context;
+    private readonly IAppBll _bll;
     private readonly IWebHostEnvironment _env;
 
-    public RepairPhotosController(AppDbContext context, IWebHostEnvironment env)
+    public RepairPhotosController(IAppBll bll, IWebHostEnvironment env)
     {
-        _context = context;
+        _bll = bll;
         _env = env;
     }
 
@@ -33,22 +33,13 @@ public class RepairPhotosController : ControllerBase
         return userId.Value;
     }
 
-    private async Task<Owner?> GetCurrentOwnerAsync()
-    {
-        var userId = GetCurrentUserId();
-        return await _context.Owners.FirstOrDefaultAsync(o => o.AppUserId == userId);
-    }
-
     private bool IsAdmin() => User.IsInRole("admin");
     private bool IsMechanic() => User.IsInRole("mechanic");
 
-    private static RepairPhotoDto MapToDto(RepairPhoto p) => new()
+    private static RestApiErrorResponse ErrorResponse(string error) => new()
     {
-        Id = p.Id,
-        Description = p.Description,
-        PhotoUrl = p.FilePath,
-        UploadedAt = p.UploadedAt,
-        ServiceOrderId = p.ServiceOrderId
+        Status = System.Net.HttpStatusCode.BadRequest,
+        Error = error
     };
 
     /// <summary>
@@ -64,27 +55,18 @@ public class RepairPhotosController : ControllerBase
     {
         if (serviceOrderId == Guid.Empty)
         {
-            return BadRequest(new RestApiErrorResponse
-            {
-                Status = System.Net.HttpStatusCode.BadRequest,
-                Error = "serviceOrderId is required."
-            });
+            return BadRequest(ErrorResponse("serviceOrderId is required."));
         }
 
-        IQueryable<RepairPhoto> query = _context.RepairPhotos
-            .Include(p => p.ServiceOrder)
-                .ThenInclude(so => so!.Vehicle)
-            .Where(p => p.ServiceOrderId == serviceOrderId);
+        var isAdmin = IsAdmin();
+        var isMechanic = IsMechanic();
+        var appUserId = isAdmin || isMechanic ? Guid.Empty : GetCurrentUserId();
 
-        if (!IsAdmin() && !IsMechanic())
-        {
-            var owner = await GetCurrentOwnerAsync();
-            if (owner == null) return Ok(new List<RepairPhotoDto>());
-            query = query.Where(p => p.ServiceOrder!.Vehicle!.OwnerId == owner.Id);
-        }
+        var photos = (await _bll.RepairPhotos.AllForApiAsync(serviceOrderId, appUserId, isAdmin, isMechanic))
+            .Select(RepairPhotoApiMapper.ToApiDto)
+            .ToList();
 
-        var photos = await query.ToListAsync();
-        return Ok(photos.Select(MapToDto).ToList());
+        return Ok(photos);
     }
 
     /// <summary>
@@ -98,137 +80,95 @@ public class RepairPhotosController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<RepairPhotoDto>> GetPhoto(Guid id)
     {
-        IQueryable<RepairPhoto> query = _context.RepairPhotos
-            .Include(p => p.ServiceOrder)
-                .ThenInclude(so => so!.Vehicle)
-            .Where(p => p.Id == id);
+        var isAdmin = IsAdmin();
+        var isMechanic = IsMechanic();
+        var appUserId = isAdmin || isMechanic ? Guid.Empty : GetCurrentUserId();
 
-        if (!IsAdmin() && !IsMechanic())
-        {
-            var owner = await GetCurrentOwnerAsync();
-            if (owner == null) return NotFound();
-            query = query.Where(p => p.ServiceOrder!.Vehicle!.OwnerId == owner.Id);
-        }
-
-        var photo = await query.FirstOrDefaultAsync();
+        var photo = await _bll.RepairPhotos.FindForApiAsync(id, appUserId, isAdmin, isMechanic);
         if (photo == null) return NotFound();
-        return Ok(MapToDto(photo));
+        return Ok(RepairPhotoApiMapper.ToApiDto(photo));
     }
 
     /// <summary>
     /// Upload a new repair photo for a service order.
     /// Admin/Mechanic only. Max 15 MB, JPG/PNG, max 20 photos per order.
     /// </summary>
-/// <summary>
-/// Upload a new repair photo for a service order.
-/// Admin/Mechanic only. Max 15 MB, JPG/PNG, max 20 photos per order.
-/// </summary>
-[HttpPost]
-[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = "admin,mechanic")]
-[Produces("application/json")]
-[Consumes("multipart/form-data")]
-[ProducesResponseType<RepairPhotoDto>(StatusCodes.Status201Created)]
-[ProducesResponseType<RestApiErrorResponse>(StatusCodes.Status400BadRequest)]
-[RequestSizeLimit(16 * 1024 * 1024)]
-public async Task<ActionResult<RepairPhotoDto>> UploadPhoto([FromForm] RepairPhotoUploadRequest request)
-{
-    var file = request.File;
-    var serviceOrderId = request.ServiceOrderId;
-    var description = request.Description;
-
-    // --- Validate file presence and size ---
-    if (file == null || file.Length == 0)
+    /// <summary>
+    /// Upload a new repair photo for a service order.
+    /// Admin/Mechanic only. Max 15 MB, JPG/PNG, max 20 photos per order.
+    /// </summary>
+    [HttpPost]
+    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = "admin,mechanic")]
+    [Produces("application/json")]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType<RepairPhotoDto>(StatusCodes.Status201Created)]
+    [ProducesResponseType<RestApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [RequestSizeLimit(16 * 1024 * 1024)]
+    public async Task<ActionResult<RepairPhotoDto>> UploadPhoto([FromForm] RepairPhotoUploadRequest request)
     {
-        return BadRequest(new RestApiErrorResponse
+        var file = request.File;
+        var serviceOrderId = request.ServiceOrderId;
+        var description = request.Description;
+
+        // --- Validate file presence and size ---
+        if (file == null || file.Length == 0)
         {
-            Status = System.Net.HttpStatusCode.BadRequest,
-            Error = "No file provided."
-        });
-    }
+            return BadRequest(ErrorResponse("No file provided."));
+        }
 
-    if (file.Length > 15 * 1024 * 1024)
-    {
-        return BadRequest(new RestApiErrorResponse
+        if (file.Length > 15 * 1024 * 1024)
         {
-            Status = System.Net.HttpStatusCode.BadRequest,
-            Error = "File exceeds maximum size of 15 MB."
-        });
-    }
+            return BadRequest(ErrorResponse("File exceeds maximum size of 15 MB."));
+        }
 
-    // --- Validate MIME type ---
-    var allowedMimeTypes = new[] { "image/jpeg", "image/png" };
-    if (!allowedMimeTypes.Contains(file.ContentType, StringComparer.OrdinalIgnoreCase))
-    {
-        return BadRequest(new RestApiErrorResponse
+        // --- Validate MIME type ---
+        var allowedMimeTypes = new[] { "image/jpeg", "image/png" };
+        if (!allowedMimeTypes.Contains(file.ContentType, StringComparer.OrdinalIgnoreCase))
         {
-            Status = System.Net.HttpStatusCode.BadRequest,
-            Error = "Only JPEG and PNG images are allowed."
-        });
-    }
+            return BadRequest(ErrorResponse("Only JPEG and PNG images are allowed."));
+        }
 
-    // --- Validate extension ---
-    var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-    var allowedExtensions = new[] { ".jpg", ".jpeg", ".png" };
-    if (!allowedExtensions.Contains(extension))
-    {
-        return BadRequest(new RestApiErrorResponse
+        // --- Validate extension ---
+        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+        var allowedExtensions = new[] { ".jpg", ".jpeg", ".png" };
+        if (!allowedExtensions.Contains(extension))
         {
-            Status = System.Net.HttpStatusCode.BadRequest,
-            Error = "Invalid file extension. Allowed: .jpg, .jpeg, .png"
-        });
-    }
+            return BadRequest(ErrorResponse("Invalid file extension. Allowed: .jpg, .jpeg, .png"));
+        }
 
-    // --- Validate service order exists ---
-    var orderExists = await _context.ServiceOrders.AnyAsync(so => so.Id == serviceOrderId);
-    if (!orderExists)
-    {
-        return BadRequest(new RestApiErrorResponse
+        // --- Validate service order exists and photo count limit ---
+        var validation = await _bll.RepairPhotos.ValidateUploadAsync(serviceOrderId);
+        if (validation.Error != null)
         {
-            Status = System.Net.HttpStatusCode.BadRequest,
-            Error = "Service order not found."
-        });
-    }
+            return BadRequest(ErrorResponse(validation.Error));
+        }
 
-    // --- Validate photo count limit (max 20) ---
-    var photoCount = await _context.RepairPhotos
-        .CountAsync(p => p.ServiceOrderId == serviceOrderId);
+        // --- Save file to disk ---
+        var uploadsFolder = Path.Combine(_env.WebRootPath, "uploads", "repair-photos");
+        Directory.CreateDirectory(uploadsFolder);
 
-    if (photoCount >= 20)
-    {
-        return BadRequest(new RestApiErrorResponse
+        var fileName = $"{Guid.NewGuid()}{extension}";
+        var filePath = Path.Combine(uploadsFolder, fileName);
+
+        await using (var stream = new FileStream(filePath, FileMode.Create))
         {
-            Status = System.Net.HttpStatusCode.BadRequest,
-            Error = "Maximum 20 photos per order."
+            await file.CopyToAsync(stream);
+        }
+
+        // --- Persist DB record ---
+        var relativeUrl = $"/uploads/repair-photos/{fileName}";
+        var photo = _bll.RepairPhotos.AddUploaded(new BllRepairPhoto
+        {
+            FilePath = relativeUrl,
+            Description = description,
+            ServiceOrderId = serviceOrderId
         });
+
+        await _bll.SaveChangesAsync();
+
+        return CreatedAtAction(nameof(GetPhoto), new { id = photo.Id }, RepairPhotoApiMapper.ToApiDto(photo));
     }
 
-    // --- Save file to disk ---
-    var uploadsFolder = Path.Combine(_env.WebRootPath, "uploads", "repair-photos");
-    Directory.CreateDirectory(uploadsFolder);
-
-    var fileName = $"{Guid.NewGuid()}{extension}";
-    var filePath = Path.Combine(uploadsFolder, fileName);
-
-    await using (var stream = new FileStream(filePath, FileMode.Create))
-    {
-        await file.CopyToAsync(stream);
-    }
-
-    // --- Persist DB record ---
-    var relativeUrl = $"/uploads/repair-photos/{fileName}";
-    var photo = new RepairPhoto
-    {
-        FilePath = relativeUrl,
-        Description = description,
-        UploadedAt = DateTime.UtcNow,
-        ServiceOrderId = serviceOrderId
-    };
-
-    _context.RepairPhotos.Add(photo);
-    await _context.SaveChangesAsync();
-
-    return CreatedAtAction(nameof(GetPhoto), new { id = photo.Id }, MapToDto(photo));
-}
     /// <summary>
     /// Delete a repair photo.
     /// Admin/Mechanic only. Removes file from disk and DB record.
@@ -239,10 +179,10 @@ public async Task<ActionResult<RepairPhotoDto>> UploadPhoto([FromForm] RepairPho
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeletePhoto(Guid id)
     {
-        var photo = await _context.RepairPhotos
-            .FirstOrDefaultAsync(p => p.Id == id);
+        var result = await _bll.RepairPhotos.RemoveForApiAsync(id);
+        if (result.NotFound) return NotFound();
 
-        if (photo == null) return NotFound();
+        var photo = result.Entity!;
 
         // --- Try to delete file from disk (non-fatal if missing) ---
         if (!string.IsNullOrEmpty(photo.FilePath))
@@ -259,12 +199,11 @@ public async Task<ActionResult<RepairPhotoDto>> UploadPhoto([FromForm] RepairPho
             }
             catch (Exception)
             {
-                // Swallow — disk errors should not block DB delete
+                // Swallow - disk errors should not block DB delete
             }
         }
 
-        _context.RepairPhotos.Remove(photo);
-        await _context.SaveChangesAsync();
+        await _bll.SaveChangesAsync();
 
         return NoContent();
     }

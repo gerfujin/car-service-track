@@ -15,6 +15,9 @@ public class AppBll : IAppBll
     private IStatusHistoryService? _statusHistories;
     private IPaymentService? _payments;
     private IOwnerService? _owners;
+    private IMechanicService? _mechanics;
+    private IServiceOrderPartService? _serviceOrderParts;
+    private IRepairPhotoService? _repairPhotos;
 
     public AppBll(IAppUnitOfWork uow)
     {
@@ -44,6 +47,15 @@ public class AppBll : IAppBll
 
     public IOwnerService Owners =>
         _owners ??= new OwnerService(_uow);
+
+    public IMechanicService Mechanics =>
+        _mechanics ??= new MechanicService(_uow);
+
+    public IServiceOrderPartService ServiceOrderParts =>
+        _serviceOrderParts ??= new ServiceOrderPartService(_uow);
+
+    public IRepairPhotoService RepairPhotos =>
+        _repairPhotos ??= new RepairPhotoService(_uow);
 
     public async Task<int> SaveChangesAsync()
     {

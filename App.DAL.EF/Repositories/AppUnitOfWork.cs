@@ -14,6 +14,9 @@ public class AppUnitOfWork : IAppUnitOfWork
     private IServiceOrderStatusHistoryRepository? _statusHistories;
     private IPaymentRepository? _payments;
     private IOwnerRepository? _owners;
+    private IMechanicRepository? _mechanics;
+    private IServiceOrderPartRepository? _serviceOrderParts;
+    private IRepairPhotoRepository? _repairPhotos;
 
     public AppUnitOfWork(AppDbContext context)
     {
@@ -43,6 +46,15 @@ public class AppUnitOfWork : IAppUnitOfWork
 
     public IOwnerRepository Owners =>
         _owners ??= new OwnerRepository(_context);
+
+    public IMechanicRepository Mechanics =>
+        _mechanics ??= new MechanicRepository(_context);
+
+    public IServiceOrderPartRepository ServiceOrderParts =>
+        _serviceOrderParts ??= new ServiceOrderPartRepository(_context);
+
+    public IRepairPhotoRepository RepairPhotos =>
+        _repairPhotos ??= new RepairPhotoRepository(_context);
 
     public async Task<int> SaveChangesAsync()
     {
