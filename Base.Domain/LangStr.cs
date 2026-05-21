@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace Base.Domain;
 
 public class LangStr : Dictionary<string, string>
@@ -18,7 +20,11 @@ public class LangStr : Dictionary<string, string>
     {
     }
 
-    public LangStr(string value) : this(value, Thread.CurrentThread.CurrentUICulture.Name)
+    public LangStr(string value) : this(
+        value,
+        string.IsNullOrWhiteSpace(CultureInfo.CurrentUICulture.Name)
+            ? "en"
+            : CultureInfo.CurrentUICulture.Name)
     {
     }
 
