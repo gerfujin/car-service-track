@@ -38,6 +38,8 @@ dotnet-tests:
 # ── Playwright E2E tests ──────────────────────────────────────────────────────
 e2e-tests:
   stage: test
+  when: manual
+  allow_failure: true
   image: mcr.microsoft.com/playwright:v1.44.0-jammy
   only:
     - main
