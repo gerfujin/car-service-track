@@ -109,7 +109,6 @@ public class VehiclesController : ControllerBase
         var userId = GetCurrentUserId();
 
         // EnsureForUserAsync: returns existing Owner, or stages a new one (no intermediate save).
-        // Email from JWT claims replaces the old _context.Users.FindAsync lookup.
         // EF inserts Owner before Vehicle in the same transaction (FK dependency ordering).
         var owner = await _bll.Owners.EnsureForUserAsync(
             userId, IdentityHelpers.GetUserEmail(User) ?? "Unknown");

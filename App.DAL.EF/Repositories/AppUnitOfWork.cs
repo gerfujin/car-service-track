@@ -17,6 +17,7 @@ public class AppUnitOfWork : IAppUnitOfWork
     private IMechanicRepository? _mechanics;
     private IServiceOrderPartRepository? _serviceOrderParts;
     private IRepairPhotoRepository? _repairPhotos;
+    private IRefreshTokenRepository? _refreshTokens;
 
     public AppUnitOfWork(AppDbContext context)
     {
@@ -55,6 +56,9 @@ public class AppUnitOfWork : IAppUnitOfWork
 
     public IRepairPhotoRepository RepairPhotos =>
         _repairPhotos ??= new RepairPhotoRepository(_context);
+
+    public IRefreshTokenRepository RefreshTokens =>
+        _refreshTokens ??= new RefreshTokenRepository(_context);
 
     public async Task<int> SaveChangesAsync()
     {

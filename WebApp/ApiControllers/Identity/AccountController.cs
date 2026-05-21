@@ -1,20 +1,19 @@
 using App.DTO.v1;
 using App.DTO.v1.Identity;
 using Base.Helpers;
+using App.BLL;
 
 namespace WebApp.ApiControllers.Identity;
 
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Security.Claims;
-using App.DAL.EF;
 using App.Domain.Identity;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 [ApiVersion("1.0")]
 [ApiController]
@@ -27,10 +26,10 @@ public class AccountController : ControllerBase
     private readonly ILogger<AccountController> _logger;
     private readonly SignInManager<AppUser> _signInManager;
     private readonly IConfiguration _configuration;
-    private readonly AppDbContext _context;
+    private readonly IAppBll _bll;
 
     public AccountController(UserManager<AppUser> userManager, ILogger<AccountController> logger,
-        SignInManager<AppUser> signInManager, IConfiguration configuration, AppDbContext context,
+        SignInManager<AppUser> signInManager, IConfiguration configuration, IAppBll bll,
         RoleManager<AppRole> roleManager)
     {
         _userManager = userManager;
@@ -38,7 +37,7 @@ public class AccountController : ControllerBase
         _logger = logger;
         _signInManager = signInManager;
         _configuration = configuration;
-        _context = context;
+        _bll = bll;
     }
 
 
@@ -229,22 +228,15 @@ public class AccountController : ControllerBase
 
 
         // clean up expired refresh tokens
-        // EF Core InMemory provider does not support ExecuteDeleteAsync, so skip during integration tests
-        if (!_context.Database.ProviderName!.Contains("InMemory"))
+        var deletedRows = await _bll.RefreshTokens.RemoveExpiredForUserAsync(appUser.Id);
+        if (deletedRows.HasValue)
         {
-            var deletedRows = await _context.RefreshTokens
-                .Where(t => t.AppUserId == appUser.Id && t.ExpirationDT < DateTime.UtcNow)
-                .ExecuteDeleteAsync();
-            _logger.LogInformation("Deleted {} refresh tokens", deletedRows);
+            _logger.LogInformation("Deleted {} refresh tokens", deletedRows.Value);
         }
 
 
-        var refreshToken = new AppRefreshToken()
-        {
-            AppUserId = appUser.Id
-        };
-        _context.RefreshTokens.Add(refreshToken);
-        await _context.SaveChangesAsync();
+        var refreshToken = _bll.RefreshTokens.AddForUser(appUser.Id);
+        await _bll.SaveChangesAsync();
 
         var jwt = IdentityHelpers.GenerateJwt(
             claimsPrincipal.Claims,
@@ -257,7 +249,7 @@ public class AccountController : ControllerBase
         var responseData = new JWTResponse()
         {
             Jwt = jwt,
-            RefreshToken = refreshToken.RefreshToken
+            RefreshToken = refreshToken
         };
 
         return Ok(responseData);
@@ -333,27 +325,20 @@ public class AccountController : ControllerBase
         }
 
         // load and compare refresh tokens
-        await _context.Entry(appUser).Collection(u => u.RefreshTokens!)
-            .Query()
-            .Where(x =>
-                (x.RefreshToken == tokenRefreshInfo.RefreshToken && x.ExpirationDT > DateTime.UtcNow) ||
-                (x.PreviousRefreshToken == tokenRefreshInfo.RefreshToken &&
-                 x.PreviousExpirationDT > DateTime.UtcNow)
-            )
-            .ToListAsync();
+        var refreshTokenResult = await _bll.RefreshTokens.RotateForRefreshAsync(appUser.Id, tokenRefreshInfo.RefreshToken);
 
-        if (appUser.RefreshTokens == null || appUser.RefreshTokens.Count == 0)
+        if (refreshTokenResult.MatchingTokenCount == 0)
         {
             return NotFound(
                 new RestApiErrorResponse()
                 {
                     Status = HttpStatusCode.NotFound,
-                    Error = $"RefreshTokens collection is null or empty - {appUser.RefreshTokens?.Count}"
+                    Error = $"RefreshTokens collection is null or empty - {refreshTokenResult.EmptyCollectionCountText}"
                 }
             );
         }
 
-        if (appUser.RefreshTokens.Count != 1)
+        if (refreshTokenResult.MatchingTokenCount != 1)
         {
             return NotFound("More than one valid refresh token found");
         }
@@ -372,22 +357,15 @@ public class AccountController : ControllerBase
         );
 
         // make new refresh token, keep old one still valid for some time
-        var refreshToken = appUser.RefreshTokens.First();
-        if (refreshToken.RefreshToken == tokenRefreshInfo.RefreshToken)
+        if (refreshTokenResult.Rotated)
         {
-            refreshToken.PreviousRefreshToken = refreshToken.RefreshToken;
-            refreshToken.PreviousExpirationDT = DateTime.UtcNow.AddMinutes(1);
-
-            refreshToken.RefreshToken = Guid.NewGuid().ToString();
-            refreshToken.ExpirationDT = DateTime.UtcNow.AddDays(7);
-
-            await _context.SaveChangesAsync();
+            await _bll.SaveChangesAsync();
         }
 
         var res = new JWTResponse()
         {
             Jwt = jwtResponseStr,
-            RefreshToken = refreshToken.RefreshToken,
+            RefreshToken = refreshTokenResult.RefreshToken!,
         };
 
         return Ok(res);
@@ -420,9 +398,7 @@ public class AccountController : ControllerBase
             return BadRequest("Deserialization error");
         }
 
-        var appUser = await _context.Users
-            .Where(u => u.Id == userId)
-            .SingleOrDefaultAsync();
+        var appUser = await _userManager.FindByIdAsync(userId.ToString());
         if (appUser == null)
         {
             return NotFound(
@@ -434,21 +410,8 @@ public class AccountController : ControllerBase
             );
         }
 
-        await _context.Entry(appUser)
-            .Collection(u => u.RefreshTokens!)
-            .Query()
-            .Where(x =>
-                (x.RefreshToken == logout.RefreshToken) ||
-                (x.PreviousRefreshToken == logout.RefreshToken)
-            )
-            .ToListAsync();
-
-        foreach (var appRefreshToken in appUser.RefreshTokens!)
-        {
-            _context.RefreshTokens.Remove(appRefreshToken);
-        }
-
-        var deleteCount = await _context.SaveChangesAsync();
+        await _bll.RefreshTokens.RemoveForLogoutAsync(userId, logout.RefreshToken);
+        var deleteCount = await _bll.SaveChangesAsync();
 
         return Ok(new {TokenDeleteCount = deleteCount});
     }

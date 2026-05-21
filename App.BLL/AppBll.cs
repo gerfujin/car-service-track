@@ -18,6 +18,7 @@ public class AppBll : IAppBll
     private IMechanicService? _mechanics;
     private IServiceOrderPartService? _serviceOrderParts;
     private IRepairPhotoService? _repairPhotos;
+    private IRefreshTokenService? _refreshTokens;
 
     public AppBll(IAppUnitOfWork uow)
     {
@@ -56,6 +57,9 @@ public class AppBll : IAppBll
 
     public IRepairPhotoService RepairPhotos =>
         _repairPhotos ??= new RepairPhotoService(_uow);
+
+    public IRefreshTokenService RefreshTokens =>
+        _refreshTokens ??= new RefreshTokenService(_uow);
 
     public async Task<int> SaveChangesAsync()
     {

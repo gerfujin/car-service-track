@@ -15,6 +15,7 @@ public interface IAppBll
     public IMechanicService Mechanics { get; }
     public IServiceOrderPartService ServiceOrderParts { get; }
     public IRepairPhotoService RepairPhotos { get; }
+    public IRefreshTokenService RefreshTokens { get; }
 
     /// <summary>
     /// Persists all staged changes. The services only stage via the repositories;
