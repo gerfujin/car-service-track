@@ -209,8 +209,8 @@ public class AccountController : ControllerBase
         var appUser = await _userManager.FindByEmailAsync(loginInfo.Email);
         if (appUser == null)
         {
-            _logger.LogWarning("WebApi login failed, email {} not found", loginInfo.Email);
-            // TODO: random delay to prevent user enumeration timing attacks
+            // "холостой" прогон bcrypt чтобы время было одинаковым
+            await _userManager.CheckPasswordAsync(new AppUser(), loginInfo.Password);
             return NotFound("User/Password problem");
         }
 

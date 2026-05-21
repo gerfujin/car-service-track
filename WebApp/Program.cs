@@ -65,7 +65,7 @@ builder.Services
     .AddCookie(options => { options.SlidingExpiration = true; })
     .AddJwtBearer(cfg =>
     {
-        cfg.RequireHttpsMetadata = false; // TODO: set to true in production!
+        cfg.RequireHttpsMetadata = true; // TODO: set to true in production!
         cfg.SaveToken = true;
         cfg.TokenValidationParameters = new TokenValidationParameters
         {
