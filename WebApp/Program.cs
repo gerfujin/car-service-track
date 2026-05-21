@@ -5,6 +5,9 @@ using System.Text.Json.Serialization;
 using App.BLL;
 using App.DAL.Contracts;
 using App.DAL.EF;
+using Orders.Infrastructure;
+using Users.Infrastructure;
+using Workshops.Infrastructure;
 using App.DAL.EF.Repositories;
 using App.DAL.EF.Seeding;
 using App.Domain.Identity;
@@ -45,6 +48,11 @@ builder.Services
 // Scoped lifetime matches AppDbContext (registered above), which AppUnitOfWork depends on.
 builder.Services.AddScoped<IAppUnitOfWork, AppUnitOfWork>();
 builder.Services.AddScoped<IAppBll, AppBll>();
+
+// Modular monolith: each module registers its own MediatR handlers and services.
+builder.Services.AddUsersModule();
+builder.Services.AddWorkshopsModule();
+builder.Services.AddOrdersModule();
 
 
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
