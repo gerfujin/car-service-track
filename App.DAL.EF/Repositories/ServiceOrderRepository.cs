@@ -1,5 +1,6 @@
 using App.DAL.Contracts;
 using App.Domain;
+using App.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace App.DAL.EF.Repositories;
@@ -26,12 +27,14 @@ public class ServiceOrderRepository : BaseRepository<ServiceOrder>, IServiceOrde
     public async Task<IEnumerable<ServiceOrder>> AllWithDetailsAsync()
     {
         return await _context.ServiceOrders
-            .Include(so => so.Vehicle)
+            .Include(so => so.Vehicle!)
+                .ThenInclude(v => v!.Owner)
             .Include(so => so.Workshop)
             .Include(so => so.Mechanic)
             .Include(so => so.ServiceOrderItems!)
                 .ThenInclude(item => item.Service)
             .Include(so => so.ServiceOrderParts)
+            .Include(so => so.Payment)
             .ToListAsync();
     }
 
@@ -62,6 +65,16 @@ public class ServiceOrderRepository : BaseRepository<ServiceOrder>, IServiceOrde
     {
         return await _context.ServiceOrders
             .AnyAsync(so => so.Id == id && so.Vehicle!.Owner!.AppUserId == appUserId);
+    }
+
+    public async Task<int> CountByStatusAsync(ServiceOrderStatus status)
+    {
+        return await _context.ServiceOrders.CountAsync(so => so.Status == status);
+    }
+
+    public async Task<int> CountByMechanicAndStatusAsync(Guid mechanicId, ServiceOrderStatus status)
+    {
+        return await _context.ServiceOrders.CountAsync(so => so.MechanicId == mechanicId && so.Status == status);
     }
 
     public async Task UpdateServiceItemsAsync(Guid serviceOrderId, ICollection<Guid> selectedServiceIds)

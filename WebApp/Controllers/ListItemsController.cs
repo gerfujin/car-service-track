@@ -1,14 +1,9 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Security.Claims;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Rendering;
-using Microsoft.EntityFrameworkCore;
-using App.DAL.EF;
-using App.Domain;
+using App.BLL;
+using App.BLL.DTO;
+using Base.Domain;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using WebApp.ViewModels;
 
 namespace WebApp.Controllers
@@ -16,44 +11,40 @@ namespace WebApp.Controllers
     [Authorize]
     public class ListItemsController : Controller
     {
-        private readonly AppDbContext _context;
+        private readonly IAppBll _bll;
 
-        public ListItemsController(AppDbContext context)
+        public ListItemsController(IAppBll bll)
         {
-            _context = context;
+            _bll = bll;
+        }
+
+        private Guid GetUserId()
+        {
+            var userIdString = User.Claims.First(c =>
+                c.Type == ClaimTypes.NameIdentifier).Value;
+            return Guid.Parse(userIdString);
         }
 
         // GET: ListItems
         public async Task<IActionResult> Index()
         {
             var userId = GetUserId();
-            var res = await _context
-                .ListItems
-                .Include(l => l.AppUser)
-                .Where(l => l.AppUserId == userId)
-                .ToListAsync();
+            var items = await _bll.ListItems.AllByUserAsync(userId);
 
-            return View(res);
+            var vm = items.Select(ToIndexItemVm).ToList();
+            return View(vm);
         }
 
         // GET: ListItems/Details/5
         public async Task<IActionResult> Details(Guid? id)
         {
-            if (id == null)
-            {
-                return NotFound();
-            }
+            if (id == null) return NotFound();
 
             var userId = GetUserId();
-            var listItem = await _context.ListItems
-                .Include(l => l.AppUser)
-                .FirstOrDefaultAsync(m => m.Id == id &&   m.AppUserId == userId);
-            if (listItem == null)
-            {
-                return NotFound();
-            }
+            var item = await _bll.ListItems.FindByUserAsync(id.Value, userId);
+            if (item == null) return NotFound();
 
-            return View(listItem);
+            return View(ToDetailsVm(item));
         }
 
         // GET: ListItems/Create
@@ -63,120 +54,77 @@ namespace WebApp.Controllers
         }
 
         // POST: ListItems/Create
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(ListItemCreateViewModel vm)
         {
-            if (ModelState.IsValid)
-            {
-                var listItem = new ListItem();
-                listItem.AppUserId = GetUserId();
-                listItem.ItemDescription = vm.ItemDescription;
-                listItem.IsDone = vm.IsDone;
-                listItem.Summary = vm.Summary;
-                
-                _context.Add(listItem);
-                await _context.SaveChangesAsync();
-                return RedirectToAction(nameof(Index));
-            }
+            if (!ModelState.IsValid) return View(vm);
 
-            return View(vm);
+            var bllItem = new BllListItem
+            {
+                ItemDescription = vm.ItemDescription,
+                Summary = new LangStr(vm.Summary),
+                IsDone = vm.IsDone,
+                AppUserId = GetUserId()
+            };
+
+            _bll.ListItems.Add(bllItem);
+            await _bll.SaveChangesAsync();
+
+            return RedirectToAction(nameof(Index));
         }
 
         // GET: ListItems/Edit/5
         public async Task<IActionResult> Edit(Guid? id)
         {
-            if (id == null)
-            {
-                return NotFound();
-            }
+            if (id == null) return NotFound();
 
             var userId = GetUserId();
+            var item = await _bll.ListItems.FindByUserAsync(id.Value, userId);
+            if (item == null) return NotFound();
 
-            var listItem = await _context.ListItems
-                .FirstOrDefaultAsync(l => l.Id == id && l.AppUserId == userId);
-            if (listItem == null)
+            var vm = new ListItemEditViewModel
             {
-                return NotFound();
-            }
-
-            var vm = new ListItemEditViewModel()
-            {
-                Id = listItem.Id,
-                ItemDescription = listItem.ItemDescription,
-                Summary = listItem.Summary,
-                IsDone = listItem.IsDone,
+                Id = item.Id,
+                ItemDescription = item.ItemDescription,
+                Summary = item.Summary.ToString(),
+                IsDone = item.IsDone
             };
 
             return View(vm);
         }
 
         // POST: ListItems/Edit/5
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(Guid id,
-            ListItemEditViewModel vm)
+        public async Task<IActionResult> Edit(Guid id, ListItemEditViewModel vm)
         {
-            if (id != vm.Id)
-            {
-                return NotFound();
-            }
+            if (id != vm.Id) return NotFound();
+            if (!ModelState.IsValid) return View(vm);
 
-            if (ModelState.IsValid)
-            {
-                var entity = await _context.ListItems.FindAsync(id);    
-                if (entity == null) return NotFound();
-                entity.ItemDescription = vm.ItemDescription;
-                entity.IsDone = vm.IsDone;
-                entity.Summary.SetTranslation(vm.Summary);
-                _context.Update(entity);
-                
-                
-                try
-                {
-                    _context.Update(entity);
-                    await _context.SaveChangesAsync();
-                }
-                catch (DbUpdateConcurrencyException)
-                {
-                    if (!ListItemExists(entity.Id))
-                    {
-                        return NotFound();
-                    }
-                    else
-                    {
-                        throw;
-                    }
-                }
+            var existing = await _bll.ListItems.FindAsync(id);
+            if (existing == null) return NotFound();
 
-                return RedirectToAction(nameof(Index));
-            }
+            existing.ItemDescription = vm.ItemDescription;
+            existing.IsDone = vm.IsDone;
+            existing.Summary = new LangStr(vm.Summary);
 
-            return View(vm);
+            await _bll.ListItems.UpdateAsync(existing);
+            await _bll.SaveChangesAsync();
+
+            return RedirectToAction(nameof(Index));
         }
 
         // GET: ListItems/Delete/5
         public async Task<IActionResult> Delete(Guid? id)
         {
-            if (id == null)
-            {
-                return NotFound();
-            }
+            if (id == null) return NotFound();
 
             var userId = GetUserId();
-            var listItem = await _context.ListItems
-                .Include(l => l.AppUser)
-                .FirstOrDefaultAsync(m => m.Id == id &&  m.AppUserId == userId);
-            if (listItem == null)
-            {
-                return NotFound();
-            }
+            var item = await _bll.ListItems.FindByUserAsync(id.Value, userId);
+            if (item == null) return NotFound();
 
-            return View(listItem);
+            return View(ToDeleteVm(item));
         }
 
         // POST: ListItems/Delete/5
@@ -185,28 +133,44 @@ namespace WebApp.Controllers
         public async Task<IActionResult> DeleteConfirmed(Guid id)
         {
             var userId = GetUserId();
-            var listItem = await _context.ListItems
-                .FirstOrDefaultAsync(l  => l.Id == id && l.AppUserId == userId);
-            if (listItem != null)
+            var item = await _bll.ListItems.FindByUserAsync(id, userId);
+
+            if (item != null)
             {
-                _context.ListItems.Remove(listItem);
+                _bll.ListItems.Remove(item);
+                await _bll.SaveChangesAsync();
             }
 
-            await _context.SaveChangesAsync();
             return RedirectToAction(nameof(Index));
         }
 
-        private bool ListItemExists(Guid id)
-        {
-            return _context.ListItems.Any(e => e.Id == id);
-        }
+        // ---- Mapping helpers ----
 
-        private Guid GetUserId()
+        private static ListItemIndexItemViewModel ToIndexItemVm(BllListItem item) => new()
         {
-            var userIdString = User.Claims.First(c =>
-                c.Type == ClaimTypes.NameIdentifier).Value;
-            var userId = Guid.Parse(userIdString);
-            return userId;
-        }
+            Id = item.Id,
+            ItemDescription = item.ItemDescription,
+            Summary = item.Summary.ToString(),
+            IsDone = item.IsDone,
+            AppUserEmail = item.AppUserEmail
+        };
+
+        private static ListItemDetailsViewModel ToDetailsVm(BllListItem item) => new()
+        {
+            Id = item.Id,
+            ItemDescription = item.ItemDescription,
+            Summary = item.Summary.ToString(),
+            IsDone = item.IsDone,
+            AppUserEmail = item.AppUserEmail
+        };
+
+        private static ListItemDeleteViewModel ToDeleteVm(BllListItem item) => new()
+        {
+            Id = item.Id,
+            ItemDescription = item.ItemDescription,
+            Summary = item.Summary.ToString(),
+            IsDone = item.IsDone,
+            AppUserEmail = item.AppUserEmail
+        };
     }
 }

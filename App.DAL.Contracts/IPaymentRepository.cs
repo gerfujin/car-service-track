@@ -12,4 +12,5 @@ public interface IPaymentRepository : IBaseRepository<Payment>
     Task<Payment?> FindByServiceOrderAsync(Guid serviceOrderId);
     Task<Payment?> FindByServiceOrderForUserAsync(Guid serviceOrderId, Guid appUserId);
     Task<bool> AnyByServiceOrderAsync(Guid serviceOrderId);
+    Task<decimal> SumPaidAmountAsync();
 }

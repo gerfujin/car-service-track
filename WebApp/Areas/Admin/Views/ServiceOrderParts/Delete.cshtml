@@ -1,0 +1,27 @@
+@model WebApp.Areas.Admin.ViewModels.ServiceOrderPartAdminViewModel
+@{ ViewData["Title"] = "Delete Order Part"; }
+
+<h2 class="mb-3">Delete Order Part</h2>
+<div class="card border-danger shadow-sm" style="max-width: 500px;">
+    <div class="card-header bg-danger text-white">
+        <strong>Confirm Deletion</strong>
+    </div>
+    <div class="card-body">
+        <p>Are you sure you want to delete this order part?</p>
+        <dl class="row">
+            <dt class="col-sm-4">Spare Part</dt>
+            <dd class="col-sm-8">@Model.SparePartName</dd>
+            <dt class="col-sm-4">Quantity</dt>
+            <dd class="col-sm-8">@Model.Quantity</dd>
+            <dt class="col-sm-4">Price</dt>
+            <dd class="col-sm-8">€@Model.Price.ToString("F2")</dd>
+        </dl>
+        <form asp-action="Delete" method="post">
+            <input type="hidden" asp-for="Id" />
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-danger">Yes, Delete</button>
+                <a asp-action="Index" asp-route-serviceOrderId="@Model.ServiceOrderId" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>

@@ -12,11 +12,11 @@
         <form @submit.prevent="handleUpdate">
           <div class="mb-3">
             <label class="form-label">{{ t('vehicles.make') }} *</label>
-            <input v-model="form.make" class="form-control" required />
+            <input v-model="form.make" class="form-control" required placeholder="e.g. Toyota" />
           </div>
           <div class="mb-3">
             <label class="form-label">{{ t('vehicles.model') }} *</label>
-            <input v-model="form.model" class="form-control" required />
+            <input v-model="form.model" class="form-control" required placeholder="e.g. Corolla" />
           </div>
           <div class="mb-3">
             <label class="form-label">{{ t('vehicles.year') }} *</label>

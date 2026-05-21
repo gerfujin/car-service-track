@@ -48,7 +48,7 @@ public class RefreshTokenService : IRefreshTokenService
         if (token.RefreshToken == refreshToken)
         {
             token.PreviousRefreshToken = token.RefreshToken;
-            token.PreviousExpirationDT = DateTime.UtcNow.AddMinutes(1);
+            token.PreviousExpirationDT = DateTime.UtcNow;
 
             token.RefreshToken = Guid.NewGuid().ToString();
             token.ExpirationDT = DateTime.UtcNow.AddDays(7);

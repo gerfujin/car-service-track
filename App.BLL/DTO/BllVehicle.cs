@@ -15,4 +15,5 @@ public class BllVehicle : IBaseEntity
     public string? Color { get; set; }
 
     public Guid OwnerId { get; set; }
+    public int ServiceOrderCount { get; set; }
 }

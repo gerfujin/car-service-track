@@ -19,4 +19,5 @@ public class ServiceOrderClientViewModel
 public class ServiceOrderClientListViewModel
 {
     public List<ServiceOrderClientViewModel> Orders { get; set; } = new();
+    public bool CanUpdateStatus { get; set; }
 }

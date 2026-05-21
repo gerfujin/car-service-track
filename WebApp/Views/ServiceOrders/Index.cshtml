@@ -3,7 +3,7 @@
 @model WebApp.ViewModels.Client.ServiceOrderClientListViewModel
 @{
     ViewData["Title"] = Localizer["Orders"];
-    var canUpdateStatus = ViewBag.CanUpdateStatus == true;
+    var canUpdateStatus = Model.CanUpdateStatus;
 }
 
 <div class="d-flex justify-content-between align-items-center mb-4">

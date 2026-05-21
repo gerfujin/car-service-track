@@ -1,8 +1,7 @@
-using App.DAL.EF;
-using App.Domain.Enums;
+using App.BLL;
+using Base.Helpers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using WebApp.Areas.Mechanic.ViewModels;
 
 namespace WebApp.Areas.Mechanic.Controllers;
@@ -11,23 +10,28 @@ namespace WebApp.Areas.Mechanic.Controllers;
 [Authorize(Roles = "mechanic")]
 public class DashboardController : Controller
 {
-    private readonly AppDbContext _context;
+    private readonly IAppBll _bll;
 
-    public DashboardController(AppDbContext context)
+    public DashboardController(IAppBll bll)
     {
-        _context = context;
+        _bll = bll;
     }
 
     public async Task<IActionResult> Index()
     {
+        var userId = IdentityHelpers.GetUserId(User);
+        if (userId == null) return Challenge();
+
+        var stats = await _bll.ServiceOrders.GetMechanicDashboardStatsAsync(userId.Value);
+
         var vm = new MechanicDashboardViewModel
         {
-            TotalOrders = await _context.ServiceOrders.CountAsync(),
-            PendingOrders = await _context.ServiceOrders.CountAsync(so => so.Status == ServiceOrderStatus.Pending),
-            InProgressOrders = await _context.ServiceOrders.CountAsync(so => so.Status == ServiceOrderStatus.InProgress),
-            CompletedOrders = await _context.ServiceOrders.CountAsync(so => so.Status == ServiceOrderStatus.Completed),
-            TotalVehicles = await _context.Vehicles.CountAsync(),
-            TotalPayments = await _context.Payments.CountAsync()
+            TotalOrders = stats.TotalServiceOrders,
+            PendingOrders = stats.PendingOrders,
+            InProgressOrders = stats.InProgressOrders,
+            CompletedOrders = stats.CompletedOrders,
+            TotalVehicles = stats.TotalVehicles,
+            TotalPayments = stats.TotalPayments
         };
 
         return View(vm);

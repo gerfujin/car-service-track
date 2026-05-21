@@ -1,11 +1,10 @@
-using App.DAL.EF;
-using App.Domain;
+using App.BLL;
 using App.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
-using Microsoft.EntityFrameworkCore;
 using WebApp.Areas.Admin.ViewModels;
+using WebApp.Helpers;
 
 namespace WebApp.Areas.Admin.Controllers;
 
@@ -13,63 +12,45 @@ namespace WebApp.Areas.Admin.Controllers;
 [Authorize(Roles = "admin,mechanic")]
 public class ServiceOrdersController : Controller
 {
-    private readonly AppDbContext _context;
+    private readonly IAppBll _appBll;
 
-    public ServiceOrdersController(AppDbContext context)
+    public ServiceOrdersController(IAppBll appBll)
     {
-        _context = context;
+        _appBll = appBll;
     }
 
     public async Task<IActionResult> Index()
     {
-        var orders = await _context.ServiceOrders
-            .Include(so => so.Vehicle)
-                .ThenInclude(v => v!.Owner)
-            .Include(so => so.Workshop)
-            .Include(so => so.Mechanic)
-            .Include(so => so.ServiceOrderItems)
-            .Include(so => so.ServiceOrderParts)
-            .Include(so => so.Payment)
-            .OrderByDescending(so => so.OrderDate)
-            .Select(so => new ServiceOrderAdminViewModel
+        var orders = await _appBll.ServiceOrders.AllWithDetailsAsync();
+        var vm = new ServiceOrderAdminListViewModel
+        {
+            Orders = orders.Select(so => new ServiceOrderAdminViewModel
             {
                 Id = so.Id,
                 Description = so.Description,
                 Status = so.Status,
                 OrderDate = so.OrderDate,
                 CompletedDate = so.CompletedDate,
-                VehicleDisplay = so.Vehicle != null ? $"{so.Vehicle.Make} {so.Vehicle.Model} ({so.Vehicle.LicensePlate})" : "N/A",
-                OwnerName = so.Vehicle != null && so.Vehicle.Owner != null
-                    ? $"{so.Vehicle.Owner.FirstName} {so.Vehicle.Owner.LastName}"
-                    : "N/A",
-                WorkshopName = so.Workshop != null ? so.Workshop.Name.ToString() : "N/A",
-                MechanicName = so.Mechanic != null ? $"{so.Mechanic.FirstName} {so.Mechanic.LastName}" : null,
-                TotalAmount = (so.ServiceOrderItems != null ? so.ServiceOrderItems.Sum(i => i.Quantity * i.UnitPrice) : 0) +
-                              (so.ServiceOrderParts != null ? so.ServiceOrderParts.Sum(p => p.Quantity * p.UnitPrice) : 0),
+                VehicleDisplay = so.VehicleDisplay ?? "N/A",
+                OwnerName = so.OwnerName ?? "N/A",
+                WorkshopName = so.WorkshopName ?? "N/A",
+                MechanicName = so.MechanicName,
+                TotalAmount = so.TotalAmount,
                 FinalPrice = so.FinalPrice,
-                HasPayment = so.Payment != null
-            })
-            .ToListAsync();
+                HasPayment = so.HasPayment
+            }).ToList()
+        };
 
-        return View(new ServiceOrderAdminListViewModel { Orders = orders });
+        return View(vm);
     }
 
     public async Task<IActionResult> UpdateStatus(Guid id)
     {
-        var order = await _context.ServiceOrders
-            .Include(so => so.Vehicle)
-            .Include(so => so.Workshop)
-            .FirstOrDefaultAsync(so => so.Id == id);
+        var order = await _appBll.ServiceOrders.FindWithDetailsAsync(id);
 
         if (order == null) return NotFound();
 
-        var mechanics = await _context.Mechanics
-            .Select(m => new SelectListItem
-            {
-                Value = m.Id.ToString(),
-                Text = $"{m.FirstName} {m.LastName}"
-            })
-            .ToListAsync();
+        var mechanics = (await _appBll.Mechanics.GetSelectListAsync()).ToSelectListItems();
 
         var vm = new ServiceOrderStatusUpdateViewModel
         {
@@ -95,42 +76,17 @@ public class ServiceOrdersController : Controller
 
         if (!ModelState.IsValid)
         {
-            // Repopulate dropdowns on validation failure
             vm.StatusOptions = Enum.GetValues<ServiceOrderStatus>()
                 .Select(s => new SelectListItem { Value = ((int)s).ToString(), Text = s.ToString() })
                 .ToList();
-            vm.MechanicOptions = await _context.Mechanics
-                .Select(m => new SelectListItem { Value = m.Id.ToString(), Text = $"{m.FirstName} {m.LastName}" })
-                .ToListAsync();
+            vm.MechanicOptions = (await _appBll.Mechanics.GetSelectListAsync()).ToSelectListItems();
             return View(vm);
         }
 
-        var order = await _context.ServiceOrders.FindAsync(id);
-        if (order == null) return NotFound();
+        var result = await _appBll.ServiceOrders.UpdateStatusForAdminAsync(id, vm.NewStatus, vm.MechanicId, vm.FinalPrice, vm.Notes);
+        if (!result) return NotFound();
 
-        var oldStatus = order.Status;
-        order.Status = vm.NewStatus;
-        order.MechanicId = vm.MechanicId;
-        order.FinalPrice = vm.FinalPrice;
-        order.UpdatedAt = DateTime.UtcNow;
-
-        if (vm.NewStatus == ServiceOrderStatus.Completed)
-        {
-            order.CompletedDate = DateTime.UtcNow;
-        }
-
-        // Add status history entry
-        var history = new ServiceOrderStatusHistory
-        {
-            ServiceOrderId = order.Id,
-            Status = vm.NewStatus,
-            Notes = vm.Notes,
-            ChangedAt = DateTime.UtcNow
-        };
-        _context.ServiceOrderStatusHistories.Add(history);
-
-        _context.Entry(order).State = EntityState.Modified;
-        await _context.SaveChangesAsync();
+        await _appBll.SaveChangesAsync();
 
         return RedirectToAction(nameof(Index));
     }

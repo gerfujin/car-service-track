@@ -1,9 +1,7 @@
-using App.DAL.EF;
-using App.Domain.Enums;
+using App.BLL;
 using Base.Helpers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using WebApp.ViewModels.Client;
 
 namespace WebApp.Controllers;
@@ -11,11 +9,11 @@ namespace WebApp.Controllers;
 [Authorize]
 public class PaymentsController : Controller
 {
-    private readonly AppDbContext _context;
+    private readonly IAppBll _bll;
 
-    public PaymentsController(AppDbContext context)
+    public PaymentsController(IAppBll bll)
     {
-        _context = context;
+        _bll = bll;
     }
 
     private bool IsAdmin() => User.IsInRole("admin");
@@ -27,35 +25,34 @@ public class PaymentsController : Controller
         var userId = IdentityHelpers.GetUserId(User);
         if (userId == null) return RedirectToAction("Login", "Account", new { area = "Identity" });
 
-        var query = _context.Payments
-            .Include(p => p.ServiceOrder)
-                .ThenInclude(so => so!.Vehicle)
-            .AsQueryable();
+        IEnumerable<App.BLL.DTO.BllPayment> bllPayments;
 
-        if (!IsAdmin() && !IsMechanic())
+        if (IsAdmin() || IsMechanic())
         {
-            // Client: own payments only
-            var owner = await _context.Owners.FirstOrDefaultAsync(o => o.AppUserId == userId);
-            if (owner == null)
-                return View(new PaymentClientListViewModel());
-            query = query.Where(p => p.ServiceOrder!.Vehicle!.OwnerId == owner.Id);
+            bllPayments = await _bll.Payments.AllWithDetailsAsync();
+        }
+        else
+        {
+            bllPayments = await _bll.Payments.AllByUserAsync(userId.Value);
         }
 
-        var payments = await query
+        var payments = bllPayments
             .OrderByDescending(p => p.CreatedAt)
-            .Select(p => new PaymentClientViewModel
-            {
-                Id = p.Id,
-                Amount = p.Amount,
-                Status = p.Status,
-                PaidAt = p.PaidAt,
-                PaymentMethod = p.PaymentMethod,
-                Notes = p.Notes,
-                ServiceOrderId = p.ServiceOrderId,
-                CreatedAt = p.CreatedAt
-            })
-            .ToListAsync();
+            .Select(ToClientVm)
+            .ToList();
 
         return View(new PaymentClientListViewModel { Payments = payments });
     }
+
+    private static PaymentClientViewModel ToClientVm(App.BLL.DTO.BllPayment p) => new()
+    {
+        Id = p.Id,
+        Amount = p.Amount,
+        Status = p.Status,
+        PaidAt = p.PaidAt,
+        PaymentMethod = p.PaymentMethod,
+        Notes = p.Notes,
+        ServiceOrderId = p.ServiceOrderId,
+        CreatedAt = p.CreatedAt
+    };
 }

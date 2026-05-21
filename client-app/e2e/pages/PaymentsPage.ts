@@ -20,7 +20,8 @@ export class PaymentsPage {
   }
 
   async clickFirstDetails(): Promise<void> {
-    await this.page.locator('a:has-text("Details")').first().click()
+    // The payment card links point to the related order, not a "Details" link
+    await this.page.locator('a.btn-outline-primary').first().click()
   }
 
   async expectAmountVisible(amount: string): Promise<void> {

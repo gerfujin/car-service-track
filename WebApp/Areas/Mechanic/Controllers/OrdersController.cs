@@ -1,9 +1,7 @@
-using App.DAL.EF;
-using App.Domain;
-using App.Domain.Enums;
+using App.BLL;
+using Base.Helpers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using WebApp.Areas.Mechanic.ViewModels;
 
 namespace WebApp.Areas.Mechanic.Controllers;
@@ -12,39 +10,25 @@ namespace WebApp.Areas.Mechanic.Controllers;
 [Authorize(Roles = "mechanic")]
 public class OrdersController : Controller
 {
-    private readonly AppDbContext _context;
+    private readonly IAppBll _bll;
 
-    public OrdersController(AppDbContext context)
+    public OrdersController(IAppBll bll)
     {
-        _context = context;
+        _bll = bll;
     }
 
     // GET: /Mechanic/Orders
     public async Task<IActionResult> Index()
     {
-        var orders = await _context.ServiceOrders
-            .Include(so => so.Vehicle)
-            .Include(so => so.Workshop)
-            .Include(so => so.Mechanic)
-            .Include(so => so.ServiceOrderItems)
-            .Include(so => so.ServiceOrderParts)
-            .Include(so => so.Payment)
-            .OrderByDescending(so => so.OrderDate)
-            .Select(so => new MechanicOrderViewModel
-            {
-                Id = so.Id,
-                Description = so.Description,
-                Status = so.Status,
-                OrderDate = so.OrderDate,
-                CompletedDate = so.CompletedDate,
-                VehicleDisplay = so.Vehicle != null ? $"{so.Vehicle.Make} {so.Vehicle.Model} ({so.Vehicle.LicensePlate})" : "N/A",
-                WorkshopName = so.Workshop != null ? so.Workshop.Name.ToString() : "N/A",
-                MechanicName = so.Mechanic != null ? $"{so.Mechanic.FirstName} {so.Mechanic.LastName}" : null,
-                TotalAmount = (so.ServiceOrderItems != null ? so.ServiceOrderItems.Sum(i => i.Quantity * i.UnitPrice) : 0) +
-                              (so.ServiceOrderParts != null ? so.ServiceOrderParts.Sum(p => p.Quantity * p.UnitPrice) : 0),
-                HasPayment = so.Payment != null
-            })
-            .ToListAsync();
+        var userId = IdentityHelpers.GetUserId(User);
+        if (userId == null) return Challenge();
+
+        var bllOrders = await _bll.ServiceOrders.AllByMechanicAsync(userId.Value);
+
+        var orders = bllOrders
+            .OrderByDescending(o => o.OrderDate)
+            .Select(ToMechanicVm)
+            .ToList();
 
         return View(new MechanicOrderListViewModel { Orders = orders });
     }
@@ -52,19 +36,18 @@ public class OrdersController : Controller
     // GET: /Mechanic/Orders/UpdateStatus/{id}
     public async Task<IActionResult> UpdateStatus(Guid id)
     {
-        var order = await _context.ServiceOrders
-            .Include(so => so.Vehicle)
-            .Include(so => so.Workshop)
-            .FirstOrDefaultAsync(so => so.Id == id);
+        var userId = IdentityHelpers.GetUserId(User);
+        if (userId == null) return Challenge();
 
+        var order = await _bll.ServiceOrders.FindByMechanicAsync(id, userId.Value);
         if (order == null) return NotFound();
 
         var vm = new MechanicUpdateStatusViewModel
         {
             Id = order.Id,
             CurrentStatus = order.Status,
-            VehicleDisplay = order.Vehicle != null ? $"{order.Vehicle.Make} {order.Vehicle.Model} ({order.Vehicle.LicensePlate})" : "N/A",
-            WorkshopName = order.Workshop != null ? order.Workshop.Name.ToString() : "N/A",
+            VehicleDisplay = order.VehicleDisplay ?? "N/A",
+            WorkshopName = order.WorkshopName ?? "N/A",
             Description = order.Description
         };
 
@@ -79,33 +62,29 @@ public class OrdersController : Controller
         if (id != vm.Id) return BadRequest();
         if (!ModelState.IsValid) return View(vm);
 
-        var order = await _context.ServiceOrders.FindAsync(id);
-        if (order == null) return NotFound();
+        var userId = IdentityHelpers.GetUserId(User);
+        if (userId == null) return Challenge();
 
-        var previousStatus = order.Status;
-        order.Status = vm.NewStatus;
-        order.UpdatedAt = DateTime.UtcNow;
+        var result = await _bll.ServiceOrders.UpdateStatusByMechanicAsync(id, userId.Value, vm.NewStatus, vm.Notes);
+        if (!result) return NotFound();
 
-        if (vm.NewStatus == ServiceOrderStatus.Completed)
-        {
-            order.CompletedDate = DateTime.UtcNow;
-        }
-
-        var statusHistory = new ServiceOrderStatusHistory
-        {
-            ServiceOrderId = order.Id,
-            Status = vm.NewStatus,
-            Notes = string.IsNullOrWhiteSpace(vm.Notes)
-                ? $"Status changed from {previousStatus} to {vm.NewStatus}"
-                : vm.Notes,
-            ChangedAt = DateTime.UtcNow
-        };
-        _context.ServiceOrderStatusHistories.Add(statusHistory);
-
-        _context.Entry(order).State = EntityState.Modified;
-        await _context.SaveChangesAsync();
+        await _bll.SaveChangesAsync();
 
         TempData["Success"] = $"Order status updated to {vm.NewStatus}.";
         return RedirectToAction(nameof(Index));
     }
+
+    private static MechanicOrderViewModel ToMechanicVm(App.BLL.DTO.BllServiceOrder so) => new()
+    {
+        Id = so.Id,
+        Description = so.Description,
+        Status = so.Status,
+        OrderDate = so.OrderDate,
+        CompletedDate = so.CompletedDate,
+        VehicleDisplay = so.VehicleDisplay ?? "N/A",
+        WorkshopName = so.WorkshopName ?? "N/A",
+        MechanicName = so.MechanicName,
+        TotalAmount = so.TotalAmount,
+        HasPayment = so.HasPayment
+    };
 }

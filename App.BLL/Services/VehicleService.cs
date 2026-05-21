@@ -88,4 +88,22 @@ public class VehicleService : IVehicleService
         var hasOrders = await _uow.ServiceOrders.AnyByVehicleAsync(vehicleId);
         return !hasOrders;
     }
+
+    public async Task<Guid> GetOrCreateOwnerIdAsync(Guid appUserId)
+    {
+        var owner = await _uow.Owners.FindByUserAsync(appUserId);
+        if (owner != null) return owner.Id;
+
+        var newOwner = new App.Domain.Owner
+        {
+            AppUserId = appUserId,
+            FirstName = "User",
+            LastName = "",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+        var added = _uow.Owners.Add(newOwner);
+        await _uow.SaveChangesAsync();
+        return added.Id;
+    }
 }

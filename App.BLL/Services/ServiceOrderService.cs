@@ -143,4 +143,145 @@ public class ServiceOrderService : IServiceOrderService
 
         return true;
     }
+
+    public async Task<List<BllSelectListItem>> GetSelectListForAdminAsync()
+    {
+        var orders = await AllAsync();
+        return orders
+            .OrderByDescending(o => o.OrderDate)
+            .Select(o => new BllSelectListItem
+            {
+                Value = o.Id.ToString(),
+                Text = $"{o.OrderDate:yyyy-MM-dd} | {o.Description ?? "Order"}"
+            })
+            .ToList();
+    }
+
+    public async Task<bool> UpdateStatusForAdminAsync(Guid orderId, ServiceOrderStatus status, Guid? mechanicId, decimal? finalPrice, string? notes)
+    {
+        var existing = await _uow.ServiceOrders.FindAsync(orderId);
+        if (existing == null) return false;
+
+        var previousStatus = existing.Status;
+        existing.Status = status;
+        existing.MechanicId = mechanicId;
+        existing.FinalPrice = finalPrice;
+        existing.UpdatedAt = DateTime.UtcNow;
+
+        if (status == ServiceOrderStatus.Completed)
+        {
+            existing.CompletedDate = DateTime.UtcNow;
+        }
+
+        _uow.ServiceOrders.Update(existing);
+
+        _uow.StatusHistories.Add(new ServiceOrderStatusHistory
+        {
+            ServiceOrderId = orderId,
+            Status = status,
+            Notes = notes ?? $"Status changed from {previousStatus} to {status}",
+            ChangedAt = DateTime.UtcNow
+        });
+
+        return true;
+    }
+
+    public async Task<BllDashboardStats> GetAdminDashboardStatsAsync()
+    {
+        var stats = new BllDashboardStats
+        {
+            TotalVehicles = await _uow.Vehicles.CountAsync(),
+            TotalServiceOrders = await _uow.ServiceOrders.CountAsync(),
+            TotalWorkshops = await _uow.Workshops.CountAsync(),
+            TotalMechanics = await _uow.Mechanics.CountAsync(),
+            TotalClients = await _uow.Owners.CountAsync(),
+            PendingOrders = await _uow.ServiceOrders.CountByStatusAsync(ServiceOrderStatus.Pending),
+            InProgressOrders = await _uow.ServiceOrders.CountByStatusAsync(ServiceOrderStatus.InProgress),
+            CompletedOrders = await _uow.ServiceOrders.CountByStatusAsync(ServiceOrderStatus.Completed),
+            TotalRevenue = await _uow.Payments.SumPaidAmountAsync(),
+            TotalPayments = await _uow.Payments.CountAsync()
+        };
+
+        return stats;
+    }
+
+    public async Task<BllDashboardStats> GetMechanicDashboardStatsAsync(Guid appUserId)
+    {
+        var mechanics = await _uow.Mechanics.AllAsync();
+        var mechanic = mechanics.FirstOrDefault(m => m.AppUserId == appUserId);
+        var mechanicId = mechanic?.Id;
+
+        var stats = new BllDashboardStats
+        {
+            TotalVehicles = await _uow.Vehicles.CountAsync(),
+            TotalPayments = await _uow.Payments.CountAsync()
+        };
+
+        if (mechanicId.HasValue)
+        {
+            stats.PendingOrders = await _uow.ServiceOrders.CountByMechanicAndStatusAsync(mechanicId.Value, ServiceOrderStatus.Pending);
+            stats.InProgressOrders = await _uow.ServiceOrders.CountByMechanicAndStatusAsync(mechanicId.Value, ServiceOrderStatus.InProgress);
+            stats.CompletedOrders = await _uow.ServiceOrders.CountByMechanicAndStatusAsync(mechanicId.Value, ServiceOrderStatus.Completed);
+            stats.TotalServiceOrders = stats.PendingOrders + stats.InProgressOrders + stats.CompletedOrders;
+        }
+
+        return stats;
+    }
+
+    public async Task<IEnumerable<BllServiceOrder>> AllByMechanicAsync(Guid appUserId)
+    {
+        var mechanics = await _uow.Mechanics.AllAsync();
+        var mechanic = mechanics.FirstOrDefault(m => m.AppUserId == appUserId);
+        if (mechanic == null) return Enumerable.Empty<BllServiceOrder>();
+
+        var entities = await _uow.ServiceOrders.AllAsync();
+        return entities
+            .Where(so => so.MechanicId == mechanic.Id)
+            .Select(so =>
+            {
+                var bll = ServiceOrderMapper.ToBll(so);
+                // Populate read-side fields from loaded entities (AllAsync may not include navigation)
+                if (bll != null)
+                {
+                    bll.VehicleDisplay = so.Vehicle != null ? $"{so.Vehicle.Make} {so.Vehicle.Model} ({so.Vehicle.LicensePlate})" : null;
+                    bll.WorkshopName = so.Workshop?.Name.ToString();
+                    bll.MechanicName = so.Mechanic != null ? $"{so.Mechanic.FirstName} {so.Mechanic.LastName}" : null;
+                }
+                return bll;
+            })
+            .Where(b => b != null)
+            .Cast<BllServiceOrder>()
+            .ToList();
+    }
+
+    public async Task<BllServiceOrder?> FindByMechanicAsync(Guid orderId, Guid appUserId)
+    {
+        var mechanics = await _uow.Mechanics.AllAsync();
+        var mechanic = mechanics.FirstOrDefault(m => m.AppUserId == appUserId);
+        if (mechanic == null) return null;
+
+        var entity = await _uow.ServiceOrders.FindAsync(orderId);
+        if (entity == null || entity.MechanicId != mechanic.Id) return null;
+
+        var bll = ServiceOrderMapper.ToBll(entity);
+        if (bll != null)
+        {
+            bll.VehicleDisplay = entity.Vehicle != null ? $"{entity.Vehicle.Make} {entity.Vehicle.Model} ({entity.Vehicle.LicensePlate})" : null;
+            bll.WorkshopName = entity.Workshop?.Name.ToString();
+            bll.MechanicName = entity.Mechanic != null ? $"{entity.Mechanic.FirstName} {entity.Mechanic.LastName}" : null;
+        }
+        return bll;
+    }
+
+    public async Task<bool> UpdateStatusByMechanicAsync(Guid orderId, Guid appUserId, ServiceOrderStatus newStatus, string? notes)
+    {
+        var mechanics = await _uow.Mechanics.AllAsync();
+        var mechanic = mechanics.FirstOrDefault(m => m.AppUserId == appUserId);
+        if (mechanic == null) return false;
+
+        var entity = await _uow.ServiceOrders.FindAsync(orderId);
+        if (entity == null || entity.MechanicId != mechanic.Id) return false;
+
+        return await SetStatusAsync(orderId, newStatus, notes);
+    }
 }

@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 
 namespace CarServiceTrack.Tests.Integration;
 
@@ -56,6 +57,12 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                 ["JWT:ExpiresInSeconds"] = "3600",
                 ["LangStrDefaultCulture"] = "en",
             });
+        });
+
+        builder.ConfigureLogging(logging =>
+        {
+            logging.ClearProviders();
+            logging.AddConsole();
         });
 
         builder.ConfigureServices(services =>

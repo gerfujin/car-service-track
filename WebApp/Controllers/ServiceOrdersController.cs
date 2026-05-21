@@ -1,9 +1,8 @@
-using App.DAL.EF;
-using App.Domain.Enums;
+using App.BLL;
+using App.BLL.DTO;
 using Base.Helpers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using WebApp.ViewModels.Client;
 
 namespace WebApp.Controllers;
@@ -11,11 +10,11 @@ namespace WebApp.Controllers;
 [Authorize]
 public class ServiceOrdersController : Controller
 {
-    private readonly AppDbContext _context;
+    private readonly IAppBll _bll;
 
-    public ServiceOrdersController(AppDbContext context)
+    public ServiceOrdersController(IAppBll bll)
     {
-        _context = context;
+        _bll = bll;
     }
 
     private bool IsAdmin() => User.IsInRole("admin");
@@ -27,43 +26,39 @@ public class ServiceOrdersController : Controller
         var userId = IdentityHelpers.GetUserId(User);
         if (userId == null) return RedirectToAction("Login", "Account", new { area = "Identity" });
 
-        var query = _context.ServiceOrders
-            .Include(so => so.Vehicle)
-            .Include(so => so.Workshop)
-            .Include(so => so.Mechanic)
-            .Include(so => so.ServiceOrderItems)
-            .Include(so => so.ServiceOrderParts)
-            .Include(so => so.Payment)
-            .AsQueryable();
+        IEnumerable<BllServiceOrder> bllOrders;
 
-        if (!IsAdmin() && !IsMechanic())
+        if (IsAdmin() || IsMechanic())
         {
-            // Client: own orders only
-            var owner = await _context.Owners.FirstOrDefaultAsync(o => o.AppUserId == userId);
-            if (owner == null)
-                return View(new ServiceOrderClientListViewModel());
-            query = query.Where(so => so.Vehicle!.OwnerId == owner.Id);
+            bllOrders = await _bll.ServiceOrders.AllWithDetailsAsync();
+        }
+        else
+        {
+            bllOrders = await _bll.ServiceOrders.AllByUserAsync(userId.Value);
         }
 
-        var orders = await query
-            .OrderByDescending(so => so.OrderDate)
-            .Select(so => new ServiceOrderClientViewModel
-            {
-                Id = so.Id,
-                Description = so.Description,
-                Status = so.Status,
-                OrderDate = so.OrderDate,
-                CompletedDate = so.CompletedDate,
-                VehicleDisplay = so.Vehicle != null ? $"{so.Vehicle.Make} {so.Vehicle.Model} ({so.Vehicle.LicensePlate})" : "N/A",
-                WorkshopName = so.Workshop != null ? so.Workshop.Name.ToString() : "N/A",
-                MechanicName = so.Mechanic != null ? $"{so.Mechanic.FirstName} {so.Mechanic.LastName}" : null,
-                TotalAmount = (so.ServiceOrderItems != null ? so.ServiceOrderItems.Sum(i => i.Quantity * i.UnitPrice) : 0) +
-                              (so.ServiceOrderParts != null ? so.ServiceOrderParts.Sum(p => p.Quantity * p.UnitPrice) : 0),
-                HasPayment = so.Payment != null
-            })
-            .ToListAsync();
+        var orders = bllOrders
+            .OrderByDescending(o => o.OrderDate)
+            .Select(ToClientVm)
+            .ToList();
 
-        ViewBag.CanUpdateStatus = IsAdmin() || IsMechanic();
-        return View(new ServiceOrderClientListViewModel { Orders = orders });
+        var canUpdateStatus = IsAdmin() || IsMechanic();
+        var vm = new ServiceOrderClientListViewModel { Orders = orders, CanUpdateStatus = canUpdateStatus };
+
+        return View(vm);
     }
+
+    private static ServiceOrderClientViewModel ToClientVm(BllServiceOrder so) => new()
+    {
+        Id = so.Id,
+        Description = so.Description,
+        Status = so.Status,
+        OrderDate = so.OrderDate,
+        CompletedDate = so.CompletedDate,
+        VehicleDisplay = so.VehicleDisplay ?? "N/A",
+        WorkshopName = so.WorkshopName ?? "N/A",
+        MechanicName = so.MechanicName,
+        TotalAmount = so.TotalAmount,
+        HasPayment = so.HasPayment
+    };
 }

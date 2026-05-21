@@ -1,4 +1,5 @@
 using App.Domain;
+using App.Domain.Enums;
 using Base.Contracts;
 
 namespace App.DAL.Contracts;
@@ -11,6 +12,12 @@ public interface IServiceOrderRepository : IBaseRepository<ServiceOrder>
     public Task<bool> AnyByVehicleAsync(Guid vehicleId);
     public Task<bool> AnyByWorkshopAsync(Guid workshopId);
     public Task<bool> IsOwnedByUserAsync(Guid id, Guid appUserId);
+
+    /// <summary>Returns the exact count of service orders with a given status.</summary>
+    public Task<int> CountByStatusAsync(ServiceOrderStatus status);
+
+    /// <summary>Returns the exact count of service orders assigned to a mechanic with a given status.</summary>
+    public Task<int> CountByMechanicAndStatusAsync(Guid mechanicId, ServiceOrderStatus status);
 
     /// <summary>
     /// Synchronises the ServiceOrderItems of an order to match the selected service ids:

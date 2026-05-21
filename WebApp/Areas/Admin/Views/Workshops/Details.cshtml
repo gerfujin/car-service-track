@@ -1,0 +1,31 @@
+@model WebApp.Areas.Admin.ViewModels.WorkshopViewModel
+@{
+    ViewData["Title"] = "Workshop Details";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>🔍 Workshop Details</h2>
+    <a asp-action="Index" class="btn btn-outline-secondary">← Back to List</a>
+</div>
+
+<div class="card shadow-sm" style="max-width: 700px;">
+    <div class="card-body">
+        <dl class="row mb-0">
+            <dt class="col-sm-4">Name</dt>
+            <dd class="col-sm-8">@Model.Name</dd>
+
+            <dt class="col-sm-4">Address</dt>
+            <dd class="col-sm-8">@Model.Address</dd>
+
+            <dt class="col-sm-4">Phone</dt>
+            <dd class="col-sm-8">@(Model.Phone ?? "-")</dd>
+
+            <dt class="col-sm-4">Email</dt>
+            <dd class="col-sm-8">@(Model.Email ?? "-")</dd>
+        </dl>
+    </div>
+    <div class="card-footer d-flex gap-2">
+        <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary">Edit</a>
+        <a asp-action="Delete" asp-route-id="@Model.Id" class="btn btn-outline-danger">Delete</a>
+    </div>
+</div>

@@ -68,4 +68,17 @@ public class SparePartService : ISparePartService
     {
         return await _uow.SpareParts.ExistsAsync(id);
     }
+
+    public async Task<List<BllSelectListItem>> GetSelectListAsync()
+    {
+        var parts = await AllAsync();
+        return parts
+            .OrderBy(p => p.Name)
+            .Select(p => new BllSelectListItem
+            {
+                Value = p.Id.ToString(),
+                Text = $"{p.Name} (€{p.UnitPrice:F2})"
+            })
+            .ToList();
+    }
 }

@@ -1,0 +1,62 @@
+@model WebApp.ViewModels.Client.VehicleClientViewModel
+@{
+    ViewData["Title"] = "Edit Vehicle";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>🚗 Edit Vehicle</h2>
+    <a asp-action="Index" class="btn btn-outline-secondary">← Back</a>
+</div>
+
+<div class="card shadow-sm" style="max-width: 600px;">
+    <div class="card-body">
+        <form asp-action="Edit" method="post">
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+            <input type="hidden" asp-for="Id" />
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label asp-for="Make" class="form-label fw-semibold">Make</label>
+                    <input asp-for="Make" class="form-control" placeholder="e.g. Toyota" />
+                    <span asp-validation-for="Make" class="text-danger small"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="Model" class="form-label fw-semibold">Model</label>
+                    <input asp-for="Model" class="form-control" placeholder="e.g. Corolla" />
+                    <span asp-validation-for="Model" class="text-danger small"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="Year" class="form-label fw-semibold">Year</label>
+                    <input asp-for="Year" class="form-control" type="number" min="1900" max="2100" />
+                    <span asp-validation-for="Year" class="text-danger small"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="LicensePlate" class="form-label fw-semibold">License Plate</label>
+                    <input asp-for="LicensePlate" class="form-control" placeholder="e.g. 123ABC" />
+                    <span asp-validation-for="LicensePlate" class="text-danger small"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="Color" class="form-label fw-semibold">Color</label>
+                    <input asp-for="Color" class="form-control" placeholder="e.g. Blue" />
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="Vin" class="form-label fw-semibold">VIN (optional)</label>
+                    <input asp-for="Vin" class="form-control" placeholder="17-character VIN" maxlength="17" />
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="Mileage" class="form-label fw-semibold">Mileage (km)</label>
+                    <input asp-for="Mileage" class="form-control" type="number" min="0" />
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 mt-4">
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+                <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @await Html.PartialAsync("_ValidationScriptsPartial")
+}

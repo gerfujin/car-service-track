@@ -1,9 +1,7 @@
-using App.DAL.EF;
-using App.Domain;
-using Base.Domain;
+using App.BLL;
+using App.BLL.DTO;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using WebApp.Areas.Admin.ViewModels;
 
 namespace WebApp.Areas.Admin.Controllers;
@@ -12,27 +10,28 @@ namespace WebApp.Areas.Admin.Controllers;
 [Authorize(Roles = "admin")]
 public class WorkshopsController : Controller
 {
-    private readonly AppDbContext _context;
+    private readonly IAppBll _appBll;
 
-    public WorkshopsController(AppDbContext context)
+    public WorkshopsController(IAppBll appBll)
     {
-        _context = context;
+        _appBll = appBll;
     }
 
     public async Task<IActionResult> Index()
     {
-        var workshops = await _context.Workshops
-            .Select(w => new WorkshopViewModel
+        var workshops = await _appBll.Workshops.AllAsync();
+        var vm = new WorkshopListViewModel
+        {
+            Workshops = workshops.Select(w => new WorkshopViewModel
             {
                 Id = w.Id,
-                Name = w.Name.ToString(),
-                Address = w.Address.ToString(),
+                Name = w.Name,
+                Address = w.Address,
                 Phone = w.Phone,
                 Email = w.Email
-            })
-            .ToListAsync();
-
-        return View(new WorkshopListViewModel { Workshops = workshops });
+            }).ToList()
+        };
+        return View(vm);
     }
 
     public IActionResult Create()
@@ -46,30 +45,30 @@ public class WorkshopsController : Controller
     {
         if (!ModelState.IsValid) return View(vm);
 
-        var workshop = new Workshop
+        var workshop = new BllWorkshop
         {
-            Name = new LangStr(vm.Name),
-            Address = new LangStr(vm.Address),
+            Name = vm.Name,
+            Address = vm.Address,
             Phone = vm.Phone,
             Email = vm.Email
         };
 
-        _context.Workshops.Add(workshop);
-        await _context.SaveChangesAsync();
+        _appBll.Workshops.Add(workshop);
+        await _appBll.SaveChangesAsync();
 
         return RedirectToAction(nameof(Index));
     }
 
     public async Task<IActionResult> Edit(Guid id)
     {
-        var workshop = await _context.Workshops.FindAsync(id);
+        var workshop = await _appBll.Workshops.FindAsync(id);
         if (workshop == null) return NotFound();
 
         var vm = new WorkshopViewModel
         {
             Id = workshop.Id,
-            Name = workshop.Name.ToString(),
-            Address = workshop.Address.ToString(),
+            Name = workshop.Name,
+            Address = workshop.Address,
             Phone = workshop.Phone,
             Email = workshop.Email
         };
@@ -84,31 +83,34 @@ public class WorkshopsController : Controller
         if (id != vm.Id) return BadRequest();
         if (!ModelState.IsValid) return View(vm);
 
-        var workshop = await _context.Workshops.FindAsync(id);
-        if (workshop == null) return NotFound();
+        var existing = await _appBll.Workshops.FindAsync(id);
+        if (existing == null) return NotFound();
 
-        workshop.Name = new LangStr(vm.Name);
-        workshop.Address = new LangStr(vm.Address);
-        workshop.Phone = vm.Phone;
-        workshop.Email = vm.Email;
-        workshop.UpdatedAt = DateTime.UtcNow;
+        var workshop = new BllWorkshop
+        {
+            Id = vm.Id,
+            Name = vm.Name,
+            Address = vm.Address,
+            Phone = vm.Phone,
+            Email = vm.Email
+        };
 
-        _context.Entry(workshop).State = EntityState.Modified;
-        await _context.SaveChangesAsync();
+        var result = await _appBll.Workshops.UpdateAsync(workshop);
+        if (result == null) return NotFound();
 
         return RedirectToAction(nameof(Index));
     }
 
     public async Task<IActionResult> Delete(Guid id)
     {
-        var workshop = await _context.Workshops.FindAsync(id);
+        var workshop = await _appBll.Workshops.FindAsync(id);
         if (workshop == null) return NotFound();
 
         var vm = new WorkshopViewModel
         {
             Id = workshop.Id,
-            Name = workshop.Name.ToString(),
-            Address = workshop.Address.ToString(),
+            Name = workshop.Name,
+            Address = workshop.Address,
             Phone = workshop.Phone,
             Email = workshop.Email
         };
@@ -120,12 +122,29 @@ public class WorkshopsController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteConfirmed(Guid id)
     {
-        var workshop = await _context.Workshops.FindAsync(id);
+        var workshop = await _appBll.Workshops.FindAsync(id);
         if (workshop == null) return NotFound();
 
-        _context.Workshops.Remove(workshop);
-        await _context.SaveChangesAsync();
+        _appBll.Workshops.Remove(workshop);
+        await _appBll.SaveChangesAsync();
 
         return RedirectToAction(nameof(Index));
+    }
+
+    public async Task<IActionResult> Details(Guid id)
+    {
+        var workshop = await _appBll.Workshops.FindAsync(id);
+        if (workshop == null) return NotFound();
+
+        var vm = new WorkshopViewModel
+        {
+            Id = workshop.Id,
+            Name = workshop.Name,
+            Address = workshop.Address,
+            Phone = workshop.Phone,
+            Email = workshop.Email
+        };
+
+        return View(vm);
     }
 }

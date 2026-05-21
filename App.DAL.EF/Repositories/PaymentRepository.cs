@@ -1,5 +1,6 @@
 using App.DAL.Contracts;
 using App.Domain;
+using App.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace App.DAL.EF.Repositories;
@@ -61,5 +62,12 @@ public class PaymentRepository : BaseRepository<Payment>, IPaymentRepository
     public async Task<bool> AnyByServiceOrderAsync(Guid serviceOrderId)
     {
         return await _context.Payments.AnyAsync(p => p.ServiceOrderId == serviceOrderId);
+    }
+
+    public async Task<decimal> SumPaidAmountAsync()
+    {
+        return await _context.Payments
+            .Where(p => p.Status == PaymentStatus.Paid)
+            .SumAsync(p => p.Amount);
     }
 }

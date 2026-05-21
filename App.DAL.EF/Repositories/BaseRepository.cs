@@ -25,6 +25,11 @@ public class BaseRepository<TEntity> : IBaseRepository<TEntity>
         return await DbSet.FirstOrDefaultAsync(e => e.Id == id);
     }
 
+    public virtual async Task<int> CountAsync()
+    {
+        return await DbSet.CountAsync();
+    }
+
     public virtual TEntity Add(TEntity entity)
     {
         return DbSet.Add(entity).Entity;

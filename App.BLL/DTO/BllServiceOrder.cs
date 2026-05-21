@@ -30,9 +30,13 @@ public class BllServiceOrder : IBaseEntity
     public string? VehicleDisplay { get; set; }
     public string? WorkshopName { get; set; }
     public string? MechanicName { get; set; }
+    public string? OwnerName { get; set; }
 
     /// <summary>Sum of ServiceOrderItems + ServiceOrderParts (qty × unit price).</summary>
     public decimal TotalAmount { get; set; }
+
+    /// <summary>Whether a payment record exists for this order.</summary>
+    public bool HasPayment { get; set; }
 
     /// <summary>Details of the selected services (names/prices) for the order detail view.</summary>
     public List<BllServiceLine>? Services { get; set; }

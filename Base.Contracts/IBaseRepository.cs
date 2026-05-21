@@ -5,6 +5,7 @@ public interface IBaseRepository<TEntity>
 {
     public Task<IEnumerable<TEntity>> AllAsync();
     public Task<TEntity?> FindAsync(Guid id);
+    public Task<int> CountAsync();
     public TEntity Add(TEntity entity);
     public TEntity Update(TEntity entity);
     public void Remove(TEntity entity);

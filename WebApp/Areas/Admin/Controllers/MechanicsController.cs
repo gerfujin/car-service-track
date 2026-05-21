@@ -1,8 +1,7 @@
-using App.DAL.EF;
-using App.Domain;
+using App.BLL;
+using App.BLL.DTO;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using WebApp.Areas.Admin.ViewModels;
 
 namespace WebApp.Areas.Admin.Controllers;
@@ -11,17 +10,19 @@ namespace WebApp.Areas.Admin.Controllers;
 [Authorize(Roles = "admin")]
 public class MechanicsController : Controller
 {
-    private readonly AppDbContext _context;
+    private readonly IAppBll _appBll;
 
-    public MechanicsController(AppDbContext context)
+    public MechanicsController(IAppBll appBll)
     {
-        _context = context;
+        _appBll = appBll;
     }
 
     public async Task<IActionResult> Index()
     {
-        var mechanics = await _context.Mechanics
-            .Select(m => new MechanicViewModel
+        var mechanics = await _appBll.Mechanics.AllAsync();
+        var vm = new MechanicListViewModel
+        {
+            Mechanics = mechanics.Select(m => new MechanicViewModel
             {
                 Id = m.Id,
                 FirstName = m.FirstName,
@@ -29,10 +30,9 @@ public class MechanicsController : Controller
                 Phone = m.Phone,
                 Email = m.Email,
                 Specialization = m.Specialization
-            })
-            .ToListAsync();
-
-        return View(new MechanicListViewModel { Mechanics = mechanics });
+            }).ToList()
+        };
+        return View(vm);
     }
 
     public IActionResult Create()
@@ -46,7 +46,7 @@ public class MechanicsController : Controller
     {
         if (!ModelState.IsValid) return View(vm);
 
-        var mechanic = new App.Domain.Mechanic
+        var mechanic = new BllMechanic
         {
             FirstName = vm.FirstName,
             LastName = vm.LastName,
@@ -55,16 +55,16 @@ public class MechanicsController : Controller
             Specialization = vm.Specialization
         };
 
-        _context.Mechanics.Add(mechanic);
-        await _context.SaveChangesAsync();
+        _appBll.Mechanics.Add(mechanic);
+        await _appBll.SaveChangesAsync();
 
-        TempData["Success"] = $"Mechanic {mechanic.FirstName} {mechanic.LastName} created successfully.";
+        TempData["Success"] = $"Mechanic {vm.FirstName} {vm.LastName} created successfully.";
         return RedirectToAction(nameof(Index));
     }
 
     public async Task<IActionResult> Edit(Guid id)
     {
-        var mechanic = await _context.Mechanics.FindAsync(id);
+        var mechanic = await _appBll.Mechanics.FindAsync(id);
         if (mechanic == null) return NotFound();
 
         var vm = new MechanicViewModel
@@ -87,26 +87,29 @@ public class MechanicsController : Controller
         if (id != vm.Id) return BadRequest();
         if (!ModelState.IsValid) return View(vm);
 
-        var mechanic = await _context.Mechanics.FindAsync(id);
-        if (mechanic == null) return NotFound();
+        var existing = await _appBll.Mechanics.FindAsync(id);
+        if (existing == null) return NotFound();
 
-        mechanic.FirstName = vm.FirstName;
-        mechanic.LastName = vm.LastName;
-        mechanic.Phone = vm.Phone;
-        mechanic.Email = vm.Email;
-        mechanic.Specialization = vm.Specialization;
-        mechanic.UpdatedAt = DateTime.UtcNow;
+        var mechanic = new BllMechanic
+        {
+            Id = vm.Id,
+            FirstName = vm.FirstName,
+            LastName = vm.LastName,
+            Phone = vm.Phone,
+            Email = vm.Email,
+            Specialization = vm.Specialization
+        };
 
-        _context.Entry(mechanic).State = EntityState.Modified;
-        await _context.SaveChangesAsync();
+        var result = await _appBll.Mechanics.UpdateAsync(mechanic);
+        if (result == null) return NotFound();
 
-        TempData["Success"] = $"Mechanic {mechanic.FirstName} {mechanic.LastName} updated successfully.";
+        TempData["Success"] = $"Mechanic {vm.FirstName} {vm.LastName} updated successfully.";
         return RedirectToAction(nameof(Index));
     }
 
     public async Task<IActionResult> Delete(Guid id)
     {
-        var mechanic = await _context.Mechanics.FindAsync(id);
+        var mechanic = await _appBll.Mechanics.FindAsync(id);
         if (mechanic == null) return NotFound();
 
         var vm = new MechanicViewModel
@@ -126,11 +129,11 @@ public class MechanicsController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteConfirmed(Guid id)
     {
-        var mechanic = await _context.Mechanics.FindAsync(id);
+        var mechanic = await _appBll.Mechanics.FindAsync(id);
         if (mechanic == null) return NotFound();
 
-        _context.Mechanics.Remove(mechanic);
-        await _context.SaveChangesAsync();
+        _appBll.Mechanics.Remove(mechanic);
+        await _appBll.SaveChangesAsync();
 
         TempData["Success"] = "Mechanic deleted successfully.";
         return RedirectToAction(nameof(Index));

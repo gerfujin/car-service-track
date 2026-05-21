@@ -19,6 +19,7 @@ public class AppBll : IAppBll
     private IServiceOrderPartService? _serviceOrderParts;
     private IRepairPhotoService? _repairPhotos;
     private IRefreshTokenService? _refreshTokens;
+    private IListItemService? _listItems;
 
     public AppBll(IAppUnitOfWork uow)
     {
@@ -60,6 +61,9 @@ public class AppBll : IAppBll
 
     public IRefreshTokenService RefreshTokens =>
         _refreshTokens ??= new RefreshTokenService(_uow);
+
+    public IListItemService ListItems =>
+        _listItems ??= new ListItemService(_uow);
 
     public async Task<int> SaveChangesAsync()
     {

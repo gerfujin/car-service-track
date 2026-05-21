@@ -1,0 +1,23 @@
+@model WebApp.Areas.Admin.ViewModels.ServiceOrderPartAdminViewModel
+@{ ViewData["Title"] = "Order Part Details"; }
+
+<h2 class="mb-3">Order Part Details</h2>
+<div class="card shadow-sm" style="max-width: 700px;">
+    <div class="card-body">
+        <dl class="row mb-0">
+            <dt class="col-sm-4">Spare Part</dt>
+            <dd class="col-sm-8">@Model.SparePartName</dd>
+            <dt class="col-sm-4">Quantity</dt>
+            <dd class="col-sm-8">@Model.Quantity</dd>
+            <dt class="col-sm-4">Price</dt>
+            <dd class="col-sm-8">€@Model.Price.ToString("F2")</dd>
+            <dt class="col-sm-4">Line Total</dt>
+            <dd class="col-sm-8">€@(Model.Quantity * Model.Price).ToString("F2")</dd>
+        </dl>
+    </div>
+    <div class="card-footer d-flex gap-2">
+        <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary">Edit</a>
+        <a asp-action="Delete" asp-route-id="@Model.Id" class="btn btn-outline-danger">Delete</a>
+        <a asp-action="Index" asp-route-serviceOrderId="@Model.ServiceOrderId" class="btn btn-outline-secondary">Back</a>
+    </div>
+</div>

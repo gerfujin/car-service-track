@@ -34,6 +34,9 @@ public static class ServiceOrderMapper
             MechanicName = entity.Mechanic != null
                 ? $"{entity.Mechanic.FirstName} {entity.Mechanic.LastName}"
                 : null,
+            OwnerName = entity.Vehicle?.Owner != null
+                ? $"{entity.Vehicle.Owner.FirstName} {entity.Vehicle.Owner.LastName}"
+                : null,
             TotalAmount =
                 (entity.ServiceOrderItems != null
                     ? entity.ServiceOrderItems.Sum(i => i.Quantity * i.UnitPrice)
@@ -52,6 +55,7 @@ public static class ServiceOrderMapper
                     EstimatedTimeMinutes = item.Service!.EstimatedTimeMinutes
                 })
                 .ToList(),
+            HasPayment = entity.Payment != null,
         };
     }
 

@@ -356,7 +356,7 @@ public class AccountController : ControllerBase
             expiresInSeconds
         );
 
-        // make new refresh token, keep old one still valid for some time
+        // make new refresh token and invalidate the old one immediately
         if (refreshTokenResult.Rotated)
         {
             await _bll.SaveChangesAsync();

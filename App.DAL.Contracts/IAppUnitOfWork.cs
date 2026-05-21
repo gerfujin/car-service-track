@@ -16,4 +16,5 @@ public interface IAppUnitOfWork : IBaseUnitOfWork
     public IServiceOrderPartRepository ServiceOrderParts { get; }
     public IRepairPhotoRepository RepairPhotos { get; }
     public IRefreshTokenRepository RefreshTokens { get; }
+    public IListItemRepository ListItems { get; }
 }

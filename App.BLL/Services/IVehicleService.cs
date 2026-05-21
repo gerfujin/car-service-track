@@ -9,6 +9,11 @@ public interface IVehicleService : IBaseService<BllVehicle>
     public Task<BllVehicle?> FindByUserAsync(Guid id, Guid appUserId);
 
     /// <summary>
+    /// Returns the OwnerId for the given AppUserId, creating an Owner record if one does not exist.
+    /// </summary>
+    public Task<Guid> GetOrCreateOwnerIdAsync(Guid appUserId);
+
+    /// <summary>
     /// Full async update: load-then-merge (preserves CreatedAt). Returns null when the
     /// vehicle does not exist. The synchronous <see cref="IBaseService{T}.Update"/> delegates here.
     /// </summary>

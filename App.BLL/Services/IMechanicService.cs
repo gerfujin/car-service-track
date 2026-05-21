@@ -10,4 +10,9 @@ public interface IMechanicService : IBaseService<BllMechanic>
     /// mechanic does not exist. The synchronous <see cref="IBaseService{T}.Update"/> delegates here.
     /// </summary>
     public Task<BllMechanic?> UpdateAsync(BllMechanic entity);
+
+    /// <summary>
+    /// Returns a list of all mechanics for dropdown rendering.
+    /// </summary>
+    public Task<List<BllSelectListItem>> GetSelectListAsync();
 }

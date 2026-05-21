@@ -66,4 +66,18 @@ public class MechanicService : IMechanicService
     {
         return await _uow.Mechanics.ExistsAsync(id);
     }
+
+    public async Task<List<BllSelectListItem>> GetSelectListAsync()
+    {
+        var mechanics = await AllAsync();
+        return mechanics
+            .OrderBy(m => m.LastName)
+            .ThenBy(m => m.FirstName)
+            .Select(m => new BllSelectListItem
+            {
+                Value = m.Id.ToString(),
+                Text = $"{m.FirstName} {m.LastName}"
+            })
+            .ToList();
+    }
 }

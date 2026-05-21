@@ -10,4 +10,9 @@ public interface ISparePartService : IBaseService<BllSparePart>
     /// spare part does not exist. The synchronous <see cref="IBaseService{T}.Update"/> delegates here.
     /// </summary>
     public Task<BllSparePart?> UpdateAsync(BllSparePart entity);
+
+    /// <summary>
+    /// Returns a list of all spare parts for dropdown rendering.
+    /// </summary>
+    public Task<List<BllSelectListItem>> GetSelectListAsync();
 }

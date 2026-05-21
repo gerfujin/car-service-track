@@ -1,8 +1,6 @@
-using App.DAL.EF;
-using App.Domain.Enums;
+using App.BLL;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using WebApp.Areas.Admin.ViewModels;
 
 namespace WebApp.Areas.Admin.Controllers;
@@ -11,31 +9,28 @@ namespace WebApp.Areas.Admin.Controllers;
 [Authorize(Roles = "admin")]
 public class DashboardController : Controller
 {
-    private readonly AppDbContext _context;
+    private readonly IAppBll _bll;
 
-    public DashboardController(AppDbContext context)
+    public DashboardController(IAppBll bll)
     {
-        _context = context;
+        _bll = bll;
     }
 
     public async Task<IActionResult> Index()
     {
+        var stats = await _bll.ServiceOrders.GetAdminDashboardStatsAsync();
+
         var vm = new DashboardViewModel
         {
-            TotalVehicles = await _context.Vehicles.CountAsync(),
-            TotalServiceOrders = await _context.ServiceOrders.CountAsync(),
-            TotalWorkshops = await _context.Workshops.CountAsync(),
-            TotalMechanics = await _context.Mechanics.CountAsync(),
-            TotalClients = await _context.Owners.CountAsync(),
-            PendingOrders = await _context.ServiceOrders
-                .CountAsync(so => so.Status == ServiceOrderStatus.Pending),
-            InProgressOrders = await _context.ServiceOrders
-                .CountAsync(so => so.Status == ServiceOrderStatus.InProgress),
-            CompletedOrders = await _context.ServiceOrders
-                .CountAsync(so => so.Status == ServiceOrderStatus.Completed),
-            TotalRevenue = await _context.Payments
-                .Where(p => p.Status == PaymentStatus.Paid)
-                .SumAsync(p => p.Amount)
+            TotalVehicles = stats.TotalVehicles,
+            TotalServiceOrders = stats.TotalServiceOrders,
+            TotalWorkshops = stats.TotalWorkshops,
+            TotalMechanics = stats.TotalMechanics,
+            TotalClients = stats.TotalClients,
+            PendingOrders = stats.PendingOrders,
+            InProgressOrders = stats.InProgressOrders,
+            CompletedOrders = stats.CompletedOrders,
+            TotalRevenue = stats.TotalRevenue
         };
 
         return View(vm);

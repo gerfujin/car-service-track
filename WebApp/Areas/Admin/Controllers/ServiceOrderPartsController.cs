@@ -1,10 +1,9 @@
-using App.DAL.EF;
-using App.Domain;
+using App.BLL;
+using App.BLL.DTO;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Rendering;
-using Microsoft.EntityFrameworkCore;
 using WebApp.Areas.Admin.ViewModels;
+using WebApp.Helpers;
 
 namespace WebApp.Areas.Admin.Controllers;
 
@@ -12,25 +11,18 @@ namespace WebApp.Areas.Admin.Controllers;
 [Authorize(Roles = "admin")]
 public class ServiceOrderPartsController : Controller
 {
-    private readonly AppDbContext _context;
+    private readonly IAppBll _appBll;
 
-    public ServiceOrderPartsController(AppDbContext context)
+    public ServiceOrderPartsController(IAppBll appBll)
     {
-        _context = context;
+        _appBll = appBll;
     }
 
     public async Task<IActionResult> Index(Guid? serviceOrderId)
     {
-        var query = _context.ServiceOrderParts
-            .Include(x => x.SparePart)
-            .AsQueryable();
-
-        if (serviceOrderId.HasValue)
-        {
-            query = query.Where(x => x.ServiceOrderId == serviceOrderId.Value);
-        }
-
-        var parts = await query
+        var allParts = await _appBll.ServiceOrderParts.AllAsync();
+        var parts = allParts
+            .Where(x => !serviceOrderId.HasValue || x.ServiceOrderId == serviceOrderId.Value)
             .Select(x => new ServiceOrderPartAdminViewModel
             {
                 Id = x.Id,
@@ -38,9 +30,9 @@ public class ServiceOrderPartsController : Controller
                 SparePartId = x.SparePartId,
                 Quantity = x.Quantity,
                 Price = x.UnitPrice,
-                SparePartName = x.SparePart != null ? (x.SparePart.Name.Translate() ?? x.SparePart.Name.ToString()) : null
+                SparePartName = x.SparePartName
             })
-            .ToListAsync();
+            .ToList();
 
         return View(new ServiceOrderPartAdminListViewModel
         {
@@ -51,7 +43,7 @@ public class ServiceOrderPartsController : Controller
 
     public async Task<IActionResult> Details(Guid id)
     {
-        var entity = await _context.ServiceOrderParts.Include(x => x.SparePart).FirstOrDefaultAsync(x => x.Id == id);
+        var entity = await _appBll.ServiceOrderParts.FindAsync(id);
         if (entity == null) return NotFound();
 
         return View(new ServiceOrderPartAdminViewModel
@@ -61,7 +53,7 @@ public class ServiceOrderPartsController : Controller
             SparePartId = entity.SparePartId,
             Quantity = entity.Quantity,
             Price = entity.UnitPrice,
-            SparePartName = entity.SparePart != null ? (entity.SparePart.Name.Translate() ?? entity.SparePart.Name.ToString()) : null
+            SparePartName = entity.SparePartName
         });
     }
 
@@ -86,8 +78,8 @@ public class ServiceOrderPartsController : Controller
             return View(vm);
         }
 
-        var order = await _context.ServiceOrders.FindAsync(vm.ServiceOrderId);
-        var sparePart = await _context.SpareParts.FindAsync(vm.SparePartId);
+        var order = await _appBll.ServiceOrders.FindAsync(vm.ServiceOrderId);
+        var sparePart = await _appBll.SpareParts.FindAsync(vm.SparePartId);
         if (order == null || sparePart == null)
         {
             TempData["Error"] = "Service order or spare part not found.";
@@ -95,7 +87,7 @@ public class ServiceOrderPartsController : Controller
             return View(vm);
         }
 
-        var entity = new ServiceOrderPart
+        var entity = new BllServiceOrderPart
         {
             ServiceOrderId = vm.ServiceOrderId,
             SparePartId = vm.SparePartId,
@@ -103,16 +95,16 @@ public class ServiceOrderPartsController : Controller
             UnitPrice = vm.Price <= 0 ? sparePart.UnitPrice : vm.Price
         };
 
-        _context.ServiceOrderParts.Add(entity);
-        await _context.SaveChangesAsync();
-        await RecalculateOrderTotalAsync(entity.ServiceOrderId);
+        _appBll.ServiceOrderParts.Add(entity);
+        await _appBll.ServiceOrderParts.RecalculateOrderTotalAsync(entity.ServiceOrderId);
+        await _appBll.SaveChangesAsync();
 
         return RedirectToAction(nameof(Index), new { serviceOrderId = vm.ServiceOrderId });
     }
 
     public async Task<IActionResult> Edit(Guid id)
     {
-        var entity = await _context.ServiceOrderParts.FindAsync(id);
+        var entity = await _appBll.ServiceOrderParts.FindAsync(id);
         if (entity == null) return NotFound();
 
         var vm = new ServiceOrderPartAdminViewModel
@@ -139,25 +131,31 @@ public class ServiceOrderPartsController : Controller
             return View(vm);
         }
 
-        var entity = await _context.ServiceOrderParts.FindAsync(id);
-        var sparePart = await _context.SpareParts.FindAsync(vm.SparePartId);
-        if (entity == null || sparePart == null) return NotFound();
+        var existing = await _appBll.ServiceOrderParts.FindAsync(id);
+        var sparePart = await _appBll.SpareParts.FindAsync(vm.SparePartId);
+        if (existing == null || sparePart == null) return NotFound();
 
-        entity.ServiceOrderId = vm.ServiceOrderId;
-        entity.SparePartId = vm.SparePartId;
-        entity.Quantity = vm.Quantity;
-        entity.UnitPrice = vm.Price <= 0 ? sparePart.UnitPrice : vm.Price;
+        var entity = new BllServiceOrderPart
+        {
+            Id = vm.Id,
+            ServiceOrderId = vm.ServiceOrderId,
+            SparePartId = vm.SparePartId,
+            Quantity = vm.Quantity,
+            UnitPrice = vm.Price <= 0 ? sparePart.UnitPrice : vm.Price
+        };
 
-        _context.Entry(entity).State = EntityState.Modified;
-        await _context.SaveChangesAsync();
-        await RecalculateOrderTotalAsync(entity.ServiceOrderId);
+        var result = await _appBll.ServiceOrderParts.UpdateAsync(entity);
+        if (result == null) return NotFound();
+
+        await _appBll.ServiceOrderParts.RecalculateOrderTotalAsync(vm.ServiceOrderId);
+        await _appBll.SaveChangesAsync();
 
         return RedirectToAction(nameof(Index), new { serviceOrderId = vm.ServiceOrderId });
     }
 
     public async Task<IActionResult> Delete(Guid id)
     {
-        var entity = await _context.ServiceOrderParts.Include(x => x.SparePart).FirstOrDefaultAsync(x => x.Id == id);
+        var entity = await _appBll.ServiceOrderParts.FindAsync(id);
         if (entity == null) return NotFound();
 
         return View(new ServiceOrderPartAdminViewModel
@@ -167,7 +165,7 @@ public class ServiceOrderPartsController : Controller
             SparePartId = entity.SparePartId,
             Quantity = entity.Quantity,
             Price = entity.UnitPrice,
-            SparePartName = entity.SparePart != null ? (entity.SparePart.Name.Translate() ?? entity.SparePart.Name.ToString()) : null
+            SparePartName = entity.SparePartName
         });
     }
 
@@ -175,52 +173,20 @@ public class ServiceOrderPartsController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteConfirmed(Guid id)
     {
-        var entity = await _context.ServiceOrderParts.FindAsync(id);
+        var entity = await _appBll.ServiceOrderParts.FindAsync(id);
         if (entity == null) return NotFound();
 
         var orderId = entity.ServiceOrderId;
-        _context.ServiceOrderParts.Remove(entity);
-        await _context.SaveChangesAsync();
-        await RecalculateOrderTotalAsync(orderId);
+        _appBll.ServiceOrderParts.Remove(entity);
+        await _appBll.ServiceOrderParts.RecalculateOrderTotalAsync(orderId);
+        await _appBll.SaveChangesAsync();
 
         return RedirectToAction(nameof(Index), new { serviceOrderId = orderId });
     }
 
     private async Task PopulateOptions(ServiceOrderPartAdminViewModel vm)
     {
-        vm.ServiceOrderOptions = await _context.ServiceOrders
-            .OrderByDescending(x => x.OrderDate)
-            .Select(x => new SelectListItem
-            {
-                Value = x.Id.ToString(),
-                Text = $"{x.OrderDate:yyyy-MM-dd} | {x.Description ?? "Order"}"
-            })
-            .ToListAsync();
-
-        vm.SparePartOptions = await _context.SpareParts
-            .OrderBy(x => x.Name)
-            .Select(x => new SelectListItem
-            {
-                Value = x.Id.ToString(),
-                Text = $"{(x.Name.Translate() ?? x.Name.ToString())} (€{x.UnitPrice:F2})"
-            })
-            .ToListAsync();
-    }
-
-    private async Task RecalculateOrderTotalAsync(Guid serviceOrderId)
-    {
-        var order = await _context.ServiceOrders
-            .Include(so => so.ServiceOrderItems)
-            .Include(so => so.ServiceOrderParts)
-            .FirstOrDefaultAsync(so => so.Id == serviceOrderId);
-
-        if (order == null) return;
-        var itemsTotal = order.ServiceOrderItems?.Sum(i => i.Quantity * i.UnitPrice) ?? 0;
-        var partsTotal = order.ServiceOrderParts?.Sum(p => p.Quantity * p.UnitPrice) ?? 0;
-        order.FinalPrice = itemsTotal + partsTotal;
-        order.UpdatedAt = DateTime.UtcNow;
-        _context.Entry(order).State = EntityState.Modified;
-        await _context.SaveChangesAsync();
+        vm.ServiceOrderOptions = (await _appBll.ServiceOrders.GetSelectListForAdminAsync()).ToSelectListItems();
+        vm.SparePartOptions = (await _appBll.SpareParts.GetSelectListAsync()).ToSelectListItems();
     }
 }
-

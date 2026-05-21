@@ -27,8 +27,8 @@ public class RefreshTokenRepository : BaseRepository<AppRefreshToken>, IRefreshT
     {
         return await _context.RefreshTokens
             .Where(x => x.AppUserId == appUserId &&
-                        ((x.RefreshToken == refreshToken && x.ExpirationDT > now) ||
-                         (x.PreviousRefreshToken == refreshToken && x.PreviousExpirationDT > now)))
+                        x.RefreshToken == refreshToken &&
+                        x.ExpirationDT > now)
             .ToListAsync();
     }
 

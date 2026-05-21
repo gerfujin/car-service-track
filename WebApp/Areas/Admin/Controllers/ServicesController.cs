@@ -1,9 +1,7 @@
-using App.DAL.EF;
-using App.Domain;
-using Base.Domain;
+using App.BLL;
+using App.BLL.DTO;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using WebApp.Areas.Admin.ViewModels;
 
 namespace WebApp.Areas.Admin.Controllers;
@@ -12,27 +10,28 @@ namespace WebApp.Areas.Admin.Controllers;
 [Authorize(Roles = "admin")]
 public class ServicesController : Controller
 {
-    private readonly AppDbContext _context;
+    private readonly IAppBll _appBll;
 
-    public ServicesController(AppDbContext context)
+    public ServicesController(IAppBll appBll)
     {
-        _context = context;
+        _appBll = appBll;
     }
 
     public async Task<IActionResult> Index()
     {
-        var services = await _context.Services
-            .Select(s => new ServiceAdminViewModel
+        var services = await _appBll.Services.AllAsync();
+        var vm = new ServiceAdminListViewModel
+        {
+            Services = services.Select(s => new ServiceAdminViewModel
             {
                 Id = s.Id,
-                Name = s.Name.ToString(),
-                Description = s.Description.ToString(),
+                Name = s.Name,
+                Description = s.Description ?? string.Empty,
                 BasePrice = s.BasePrice,
                 EstimatedTimeMinutes = s.EstimatedTimeMinutes
-            })
-            .ToListAsync();
-
-        return View(new ServiceAdminListViewModel { Services = services });
+            }).ToList()
+        };
+        return View(vm);
     }
 
     public IActionResult Create()
@@ -46,16 +45,16 @@ public class ServicesController : Controller
     {
         if (!ModelState.IsValid) return View(vm);
 
-        var service = new Service
+        var service = new BllService
         {
-            Name = new LangStr(vm.Name),
-            Description = new LangStr(vm.Description),
+            Name = vm.Name,
+            Description = vm.Description,
             BasePrice = vm.BasePrice,
             EstimatedTimeMinutes = vm.EstimatedTimeMinutes
         };
 
-        _context.Services.Add(service);
-        await _context.SaveChangesAsync();
+        _appBll.Services.Add(service);
+        await _appBll.SaveChangesAsync();
 
         TempData["Success"] = $"Service '{vm.Name}' created successfully.";
         return RedirectToAction(nameof(Index));
@@ -63,14 +62,14 @@ public class ServicesController : Controller
 
     public async Task<IActionResult> Edit(Guid id)
     {
-        var service = await _context.Services.FindAsync(id);
+        var service = await _appBll.Services.FindAsync(id);
         if (service == null) return NotFound();
 
         var vm = new ServiceAdminViewModel
         {
             Id = service.Id,
-            Name = service.Name.ToString(),
-            Description = service.Description.ToString(),
+            Name = service.Name,
+            Description = service.Description ?? string.Empty,
             BasePrice = service.BasePrice,
             EstimatedTimeMinutes = service.EstimatedTimeMinutes
         };
@@ -85,17 +84,20 @@ public class ServicesController : Controller
         if (id != vm.Id) return BadRequest();
         if (!ModelState.IsValid) return View(vm);
 
-        var service = await _context.Services.FindAsync(id);
-        if (service == null) return NotFound();
+        var existing = await _appBll.Services.FindAsync(id);
+        if (existing == null) return NotFound();
 
-        service.Name = new LangStr(vm.Name);
-        service.Description = new LangStr(vm.Description);
-        service.BasePrice = vm.BasePrice;
-        service.EstimatedTimeMinutes = vm.EstimatedTimeMinutes;
-        service.UpdatedAt = DateTime.UtcNow;
+        var service = new BllService
+        {
+            Id = vm.Id,
+            Name = vm.Name,
+            Description = vm.Description,
+            BasePrice = vm.BasePrice,
+            EstimatedTimeMinutes = vm.EstimatedTimeMinutes
+        };
 
-        _context.Entry(service).State = EntityState.Modified;
-        await _context.SaveChangesAsync();
+        var result = await _appBll.Services.UpdateAsync(service);
+        if (result == null) return NotFound();
 
         TempData["Success"] = $"Service '{vm.Name}' updated successfully.";
         return RedirectToAction(nameof(Index));
@@ -103,14 +105,14 @@ public class ServicesController : Controller
 
     public async Task<IActionResult> Delete(Guid id)
     {
-        var service = await _context.Services.FindAsync(id);
+        var service = await _appBll.Services.FindAsync(id);
         if (service == null) return NotFound();
 
         var vm = new ServiceAdminViewModel
         {
             Id = service.Id,
-            Name = service.Name.ToString(),
-            Description = service.Description.ToString(),
+            Name = service.Name,
+            Description = service.Description ?? string.Empty,
             BasePrice = service.BasePrice,
             EstimatedTimeMinutes = service.EstimatedTimeMinutes
         };
@@ -122,11 +124,11 @@ public class ServicesController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteConfirmed(Guid id)
     {
-        var service = await _context.Services.FindAsync(id);
+        var service = await _appBll.Services.FindAsync(id);
         if (service == null) return NotFound();
 
-        _context.Services.Remove(service);
-        await _context.SaveChangesAsync();
+        _appBll.Services.Remove(service);
+        await _appBll.SaveChangesAsync();
 
         TempData["Success"] = "Service deleted successfully.";
         return RedirectToAction(nameof(Index));
@@ -134,14 +136,14 @@ public class ServicesController : Controller
 
     public async Task<IActionResult> Details(Guid id)
     {
-        var service = await _context.Services.FindAsync(id);
+        var service = await _appBll.Services.FindAsync(id);
         if (service == null) return NotFound();
 
         var vm = new ServiceAdminViewModel
         {
             Id = service.Id,
-            Name = service.Name.ToString(),
-            Description = service.Description.ToString(),
+            Name = service.Name,
+            Description = service.Description ?? string.Empty,
             BasePrice = service.BasePrice,
             EstimatedTimeMinutes = service.EstimatedTimeMinutes
         };

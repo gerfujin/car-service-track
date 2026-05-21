@@ -1,10 +1,8 @@
-using App.DAL.EF;
-using App.Domain;
-using Base.Domain;
+using App.BLL;
+using App.BLL.DTO;
 using Base.Helpers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using WebApp.ViewModels.Client;
 
 namespace WebApp.Controllers;
@@ -12,11 +10,11 @@ namespace WebApp.Controllers;
 [Authorize]
 public class VehiclesController : Controller
 {
-    private readonly AppDbContext _context;
+    private readonly IAppBll _bll;
 
-    public VehiclesController(AppDbContext context)
+    public VehiclesController(IAppBll bll)
     {
-        _context = context;
+        _bll = bll;
     }
 
     private Guid GetCurrentUserId()
@@ -26,45 +24,31 @@ public class VehiclesController : Controller
         return userId.Value;
     }
 
-    private async Task<Owner?> GetCurrentOwnerAsync()
-    {
-        var userId = GetCurrentUserId();
-        return await _context.Owners.FirstOrDefaultAsync(o => o.AppUserId == userId);
-    }
-
     private bool IsAdmin() => User.IsInRole("admin");
     private bool IsMechanic() => User.IsInRole("mechanic");
 
     // GET: /Vehicles
     public async Task<IActionResult> Index()
     {
-        IQueryable<Vehicle> query = _context.Vehicles;
+        IEnumerable<BllVehicle> vehicles;
 
-        if (!IsAdmin() && !IsMechanic())
+        if (IsAdmin() || IsMechanic())
         {
-            var owner = await GetCurrentOwnerAsync();
-            if (owner == null)
-                return View(new VehicleListClientViewModel());
-            query = query.Where(v => v.OwnerId == owner.Id);
+            vehicles = await _bll.Vehicles.AllAsync();
+        }
+        else
+        {
+            var userId = GetCurrentUserId();
+            vehicles = await _bll.Vehicles.AllByUserAsync(userId);
         }
 
-        var vehicles = await query
-            .Select(v => new VehicleClientViewModel
-            {
-                Id = v.Id,
-                Make = v.Make,
-                Model = v.Model,
-                Year = v.Year,
-                LicensePlate = v.LicensePlate,
-                Vin = v.Vin,
-                Mileage = v.Mileage,
-                Color = v.Color,
-                ServiceOrderCount = v.ServiceOrders != null ? v.ServiceOrders.Count : 0
-            })
-            .ToListAsync();
+        var vm = new VehicleListClientViewModel
+        {
+            Vehicles = vehicles.Select(ToClientVm).ToList()
+        };
 
         ViewBag.IsReadOnly = IsMechanic();
-        return View(new VehicleListClientViewModel { Vehicles = vehicles });
+        return View(vm);
     }
 
     // GET: /Vehicles/Create — admin and client only
@@ -83,22 +67,9 @@ public class VehiclesController : Controller
         if (!ModelState.IsValid) return View(vm);
 
         var userId = GetCurrentUserId();
-        var owner = await _context.Owners.FirstOrDefaultAsync(o => o.AppUserId == userId);
+        var ownerId = await _bll.Vehicles.GetOrCreateOwnerIdAsync(userId);
 
-        if (owner == null)
-        {
-            var user = await _context.Users.FindAsync(userId);
-            owner = new Owner
-            {
-                AppUserId = userId,
-                FirstName = user?.UserName?.Split('@')[0] ?? "User",
-                LastName = ""
-            };
-            _context.Owners.Add(owner);
-            await _context.SaveChangesAsync();
-        }
-
-        var vehicle = new Vehicle
+        var bllVehicle = new BllVehicle
         {
             Make = vm.Make,
             Model = vm.Model,
@@ -107,11 +78,11 @@ public class VehiclesController : Controller
             Vin = vm.Vin,
             Mileage = vm.Mileage,
             Color = vm.Color,
-            OwnerId = owner.Id
+            OwnerId = ownerId
         };
 
-        _context.Vehicles.Add(vehicle);
-        await _context.SaveChangesAsync();
+        _bll.Vehicles.Add(bllVehicle);
+        await _bll.SaveChangesAsync();
 
         return RedirectToAction(nameof(Index));
     }
@@ -120,16 +91,18 @@ public class VehiclesController : Controller
     [Authorize(Roles = "admin,client")]
     public async Task<IActionResult> Edit(Guid id)
     {
-        IQueryable<Vehicle> query = _context.Vehicles.Where(v => v.Id == id);
+        BllVehicle? vehicle;
 
-        if (!IsAdmin())
+        if (IsAdmin())
         {
-            var owner = await GetCurrentOwnerAsync();
-            if (owner == null) return NotFound();
-            query = query.Where(v => v.OwnerId == owner.Id);
+            vehicle = await _bll.Vehicles.FindAsync(id);
+        }
+        else
+        {
+            var userId = GetCurrentUserId();
+            vehicle = await _bll.Vehicles.FindByUserAsync(id, userId);
         }
 
-        var vehicle = await query.FirstOrDefaultAsync();
         if (vehicle == null) return NotFound();
 
         var vm = new VehicleClientViewModel
@@ -156,29 +129,30 @@ public class VehiclesController : Controller
         if (id != vm.Id) return BadRequest();
         if (!ModelState.IsValid) return View(vm);
 
-        IQueryable<Vehicle> query = _context.Vehicles.Where(v => v.Id == id);
+        BllVehicle? existing;
 
-        if (!IsAdmin())
+        if (IsAdmin())
         {
-            var owner = await GetCurrentOwnerAsync();
-            if (owner == null) return NotFound();
-            query = query.Where(v => v.OwnerId == owner.Id);
+            existing = await _bll.Vehicles.FindAsync(id);
+        }
+        else
+        {
+            var userId = GetCurrentUserId();
+            existing = await _bll.Vehicles.FindByUserAsync(id, userId);
         }
 
-        var vehicle = await query.FirstOrDefaultAsync();
-        if (vehicle == null) return NotFound();
+        if (existing == null) return NotFound();
 
-        vehicle.Make = vm.Make;
-        vehicle.Model = vm.Model;
-        vehicle.Year = vm.Year;
-        vehicle.LicensePlate = vm.LicensePlate;
-        vehicle.Vin = vm.Vin;
-        vehicle.Mileage = vm.Mileage;
-        vehicle.Color = vm.Color;
-        vehicle.UpdatedAt = DateTime.UtcNow;
+        existing.Make = vm.Make;
+        existing.Model = vm.Model;
+        existing.Year = vm.Year;
+        existing.LicensePlate = vm.LicensePlate;
+        existing.Vin = vm.Vin;
+        existing.Mileage = vm.Mileage;
+        existing.Color = vm.Color;
 
-        _context.Entry(vehicle).State = EntityState.Modified;
-        await _context.SaveChangesAsync();
+        await _bll.Vehicles.UpdateAsync(existing);
+        await _bll.SaveChangesAsync();
 
         return RedirectToAction(nameof(Index));
     }
@@ -186,18 +160,18 @@ public class VehiclesController : Controller
     // GET: /Vehicles/Details/{id}
     public async Task<IActionResult> Details(Guid id)
     {
-        IQueryable<Vehicle> query = _context.Vehicles
-            .Include(v => v.ServiceOrders)
-            .Where(v => v.Id == id);
+        BllVehicle? vehicle;
 
-        if (!IsAdmin() && !IsMechanic())
+        if (IsAdmin() || IsMechanic())
         {
-            var owner = await GetCurrentOwnerAsync();
-            if (owner == null) return NotFound();
-            query = query.Where(v => v.OwnerId == owner.Id);
+            vehicle = await _bll.Vehicles.FindAsync(id);
+        }
+        else
+        {
+            var userId = GetCurrentUserId();
+            vehicle = await _bll.Vehicles.FindByUserAsync(id, userId);
         }
 
-        var vehicle = await query.FirstOrDefaultAsync();
         if (vehicle == null) return NotFound();
 
         var vm = new VehicleClientViewModel
@@ -210,7 +184,7 @@ public class VehiclesController : Controller
             Vin = vehicle.Vin,
             Mileage = vehicle.Mileage,
             Color = vehicle.Color,
-            ServiceOrderCount = vehicle.ServiceOrders?.Count ?? 0
+            ServiceOrderCount = vehicle.ServiceOrderCount
         };
 
         ViewBag.IsReadOnly = IsMechanic();
@@ -221,16 +195,18 @@ public class VehiclesController : Controller
     [Authorize(Roles = "admin,client")]
     public async Task<IActionResult> Delete(Guid id)
     {
-        IQueryable<Vehicle> query = _context.Vehicles.Where(v => v.Id == id);
+        BllVehicle? vehicle;
 
-        if (!IsAdmin())
+        if (IsAdmin())
         {
-            var owner = await GetCurrentOwnerAsync();
-            if (owner == null) return NotFound();
-            query = query.Where(v => v.OwnerId == owner.Id);
+            vehicle = await _bll.Vehicles.FindAsync(id);
+        }
+        else
+        {
+            var userId = GetCurrentUserId();
+            vehicle = await _bll.Vehicles.FindByUserAsync(id, userId);
         }
 
-        var vehicle = await query.FirstOrDefaultAsync();
         if (vehicle == null) return NotFound();
 
         var vm = new VehicleClientViewModel
@@ -254,21 +230,38 @@ public class VehiclesController : Controller
     [Authorize(Roles = "admin,client")]
     public async Task<IActionResult> DeleteConfirmed(Guid id)
     {
-        IQueryable<Vehicle> query = _context.Vehicles.Where(v => v.Id == id);
+        BllVehicle? vehicle;
 
-        if (!IsAdmin())
+        if (IsAdmin())
         {
-            var owner = await GetCurrentOwnerAsync();
-            if (owner == null) return NotFound();
-            query = query.Where(v => v.OwnerId == owner.Id);
+            vehicle = await _bll.Vehicles.FindAsync(id);
+        }
+        else
+        {
+            var userId = GetCurrentUserId();
+            vehicle = await _bll.Vehicles.FindByUserAsync(id, userId);
         }
 
-        var vehicle = await query.FirstOrDefaultAsync();
         if (vehicle == null) return NotFound();
 
-        _context.Vehicles.Remove(vehicle);
-        await _context.SaveChangesAsync();
+        _bll.Vehicles.Remove(vehicle);
+        await _bll.SaveChangesAsync();
 
         return RedirectToAction(nameof(Index));
     }
+
+    // ---- Mapping ----
+
+    private static VehicleClientViewModel ToClientVm(BllVehicle vehicle) => new()
+    {
+        Id = vehicle.Id,
+        Make = vehicle.Make,
+        Model = vehicle.Model,
+        Year = vehicle.Year,
+        LicensePlate = vehicle.LicensePlate,
+        Vin = vehicle.Vin,
+        Mileage = vehicle.Mileage,
+        Color = vehicle.Color,
+        ServiceOrderCount = vehicle.ServiceOrderCount
+    };
 }

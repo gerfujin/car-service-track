@@ -103,6 +103,7 @@ test.describe('Payments', () => {
     page,
     context,
   }) => {
+    await page.goto('/')
     await context.clearCookies()
     await page.evaluate(() => localStorage.clear())
 
