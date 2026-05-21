@@ -2,7 +2,10 @@ using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using System.Text.Json.Serialization;
+using App.BLL;
+using App.DAL.Contracts;
 using App.DAL.EF;
+using App.DAL.EF.Repositories;
 using App.DAL.EF.Seeding;
 using App.Domain.Identity;
 using Asp.Versioning;
@@ -37,6 +40,11 @@ builder.Services
         .EnableSensitiveDataLogging()
         .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTrackingWithIdentityResolution)
     );
+
+// Clean architecture layers: DAL UnitOfWork + BLL facade.
+// Scoped lifetime matches AppDbContext (registered above), which AppUnitOfWork depends on.
+builder.Services.AddScoped<IAppUnitOfWork, AppUnitOfWork>();
+builder.Services.AddScoped<IAppBll, AppBll>();
 
 
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();

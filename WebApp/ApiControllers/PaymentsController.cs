@@ -1,5 +1,5 @@
-using App.DAL.EF;
-using App.Domain;
+using App.BLL;
+using App.BLL.DTO;
 using App.Domain.Enums;
 using App.DTO.v1;
 using App.DTO.v1.Payment;
@@ -8,7 +8,7 @@ using Base.Helpers;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using WebApp.Mappers;
 
 namespace WebApp.ApiControllers;
 
@@ -18,11 +18,11 @@ namespace WebApp.ApiControllers;
 [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
 public class PaymentsController : ControllerBase
 {
-    private readonly AppDbContext _context;
+    private readonly IAppBll _bll;
 
-    public PaymentsController(AppDbContext context)
+    public PaymentsController(IAppBll bll)
     {
-        _context = context;
+        _bll = bll;
     }
 
     private Guid GetCurrentUserId()
@@ -32,34 +32,8 @@ public class PaymentsController : ControllerBase
         return userId.Value;
     }
 
-    private async Task<Owner?> GetCurrentOwnerAsync()
-    {
-        var userId = GetCurrentUserId();
-        return await _context.Owners.FirstOrDefaultAsync(o => o.AppUserId == userId);
-    }
-
     private bool IsAdmin() => User.IsInRole("admin");
     private bool IsMechanic() => User.IsInRole("mechanic");
-
-    private static PaymentDto MapToDto(Payment p)
-    {
-        return new PaymentDto
-        {
-            Id = p.Id,
-            Amount = p.Amount,
-            Status = p.Status,
-            PaidAt = p.PaidAt,
-            PaymentMethod = p.PaymentMethod,
-            Notes = p.Notes,
-            ServiceOrderId = p.ServiceOrderId,
-            OwnerId = p.ServiceOrder?.Vehicle?.OwnerId,
-            CreatedAt = p.CreatedAt,
-            VehicleInfo = p.ServiceOrder?.Vehicle != null
-                ? $"{p.ServiceOrder.Vehicle.Make} {p.ServiceOrder.Vehicle.Model} ({p.ServiceOrder.Vehicle.LicensePlate})"
-                : null,
-            WorkshopName = p.ServiceOrder?.Workshop?.Name.ToString()
-        };
-    }
 
     /// <summary>
     /// Get payments.
@@ -72,27 +46,17 @@ public class PaymentsController : ControllerBase
     [ProducesResponseType<IEnumerable<PaymentDto>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<PaymentDto>>> GetPayments([FromQuery] Guid? serviceOrderId = null)
     {
-        IQueryable<Payment> query = _context.Payments
-            .Include(p => p.ServiceOrder)
-                .ThenInclude(so => so!.Vehicle)
-            .Include(p => p.ServiceOrder)
-                .ThenInclude(so => so!.Workshop);
-
-        if (serviceOrderId.HasValue)
-        {
-            query = query.Where(p => p.ServiceOrderId == serviceOrderId.Value);
-        }
-
+        IEnumerable<BllPayment> payments;
         if (!IsAdmin() && !IsMechanic())
         {
-            // Client: IDOR — own payments only
-            var owner = await GetCurrentOwnerAsync();
-            if (owner == null) return Ok(new List<PaymentDto>());
-            query = query.Where(p => p.ServiceOrder!.Vehicle!.OwnerId == owner.Id);
+            // Client: IDOR — own payments only. Empty list returned when no owner profile exists.
+            payments = await _bll.Payments.AllByUserAsync(GetCurrentUserId(), serviceOrderId);
         }
-
-        var payments = await query.ToListAsync();
-        return Ok(payments.Select(MapToDto).ToList());
+        else
+        {
+            payments = await _bll.Payments.AllWithDetailsAsync(serviceOrderId);
+        }
+        return Ok(payments.Select(PaymentApiMapper.ToApiDto).ToList());
     }
 
     /// <summary>
@@ -106,23 +70,17 @@ public class PaymentsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<PaymentDto>> GetPayment(Guid id)
     {
-        IQueryable<Payment> query = _context.Payments
-            .Include(p => p.ServiceOrder)
-                .ThenInclude(so => so!.Vehicle)
-            .Include(p => p.ServiceOrder)
-                .ThenInclude(so => so!.Workshop)
-            .Where(p => p.Id == id);
-
+        BllPayment? payment;
         if (!IsAdmin() && !IsMechanic())
         {
-            var owner = await GetCurrentOwnerAsync();
-            if (owner == null) return NotFound();
-            query = query.Where(p => p.ServiceOrder!.Vehicle!.OwnerId == owner.Id);
+            payment = await _bll.Payments.FindWithDetailsForUserAsync(id, GetCurrentUserId());
         }
-
-        var payment = await query.FirstOrDefaultAsync();
+        else
+        {
+            payment = await _bll.Payments.FindWithDetailsAsync(id);
+        }
         if (payment == null) return NotFound();
-        return Ok(MapToDto(payment));
+        return Ok(PaymentApiMapper.ToApiDto(payment));
     }
 
     /// <summary>
@@ -136,28 +94,22 @@ public class PaymentsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<PaymentDto>> GetPaymentByOrder(Guid serviceOrderId)
     {
-        IQueryable<Payment> query = _context.Payments
-            .Include(p => p.ServiceOrder)
-                .ThenInclude(so => so!.Vehicle)
-            .Include(p => p.ServiceOrder)
-                .ThenInclude(so => so!.Workshop)
-            .Where(p => p.ServiceOrderId == serviceOrderId);
-
+        BllPayment? payment;
         if (!IsAdmin() && !IsMechanic())
         {
-            var owner = await GetCurrentOwnerAsync();
-            if (owner == null) return NotFound();
-            query = query.Where(p => p.ServiceOrder!.Vehicle!.OwnerId == owner.Id);
+            payment = await _bll.Payments.FindByServiceOrderForUserAsync(serviceOrderId, GetCurrentUserId());
         }
-
-        var payment = await query.FirstOrDefaultAsync();
+        else
+        {
+            payment = await _bll.Payments.FindByServiceOrderAsync(serviceOrderId);
+        }
         if (payment == null) return NotFound();
-        return Ok(MapToDto(payment));
+        return Ok(PaymentApiMapper.ToApiDto(payment));
     }
 
     /// <summary>
     /// Create a new payment invoice for a service order.
-    /// Admin only. Server sets status=Pending, paymentDate=null, ownerId from ServiceOrder.Vehicle.OwnerId.
+    /// Admin only. Server sets Status=Pending; one payment per ServiceOrder enforced.
     /// </summary>
     [HttpPost]
     [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = "admin")]
@@ -167,66 +119,22 @@ public class PaymentsController : ControllerBase
     [ProducesResponseType<RestApiErrorResponse>(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<PaymentDto>> CreatePayment([FromBody] PaymentCreateDto dto)
     {
-        var serviceOrder = await _context.ServiceOrders
-            .Include(so => so.Vehicle)
-            .Include(so => so.Workshop)
-            .FirstOrDefaultAsync(so => so.Id == dto.ServiceOrderId);
-
-        if (serviceOrder == null)
+        var (bllPayment, error) = await _bll.Payments.CreateForServiceOrderAsync(dto.ServiceOrderId, dto.Amount);
+        if (error != null)
         {
             return BadRequest(new RestApiErrorResponse
             {
                 Status = System.Net.HttpStatusCode.BadRequest,
-                Error = "Service order not found."
+                Error = error
             });
         }
-
-        // Check if payment already exists (one-to-one DB constraint)
-        var alreadyExists = await _context.Payments
-            .AnyAsync(p => p.ServiceOrderId == dto.ServiceOrderId);
-
-        if (alreadyExists)
-        {
-            return BadRequest(new RestApiErrorResponse
-            {
-                Status = System.Net.HttpStatusCode.BadRequest,
-                Error = "A payment invoice already exists for this service order."
-            });
-        }
-
-        var payment = new Payment
-        {
-            Amount = dto.Amount,
-            Status = PaymentStatus.Pending,
-            ServiceOrderId = dto.ServiceOrderId,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        };
-
-        _context.Payments.Add(payment);
-        await _context.SaveChangesAsync();
-
-        var result = new PaymentDto
-        {
-            Id = payment.Id,
-            Amount = payment.Amount,
-            Status = payment.Status,
-            PaidAt = payment.PaidAt,
-            ServiceOrderId = payment.ServiceOrderId,
-            OwnerId = serviceOrder.Vehicle?.OwnerId,
-            CreatedAt = payment.CreatedAt,
-            VehicleInfo = serviceOrder.Vehicle != null
-                ? $"{serviceOrder.Vehicle.Make} {serviceOrder.Vehicle.Model} ({serviceOrder.Vehicle.LicensePlate})"
-                : null,
-            WorkshopName = serviceOrder.Workshop?.Name.ToString()
-        };
-
-        return CreatedAtAction(nameof(GetPayment), new { id = payment.Id }, result);
+        await _bll.SaveChangesAsync();
+        return CreatedAtAction(nameof(GetPayment), new { id = bllPayment!.Id }, PaymentApiMapper.ToApiDto(bllPayment));
     }
 
     /// <summary>
     /// Mark a payment as paid (Status: Pending → Paid).
-    /// Client (owner) only. IDOR: only own payments. Only if status=Pending.
+    /// Client (owner) only. IDOR: only own payments. Only if Status=Pending.
     /// </summary>
     [HttpPatch("{id:guid}/pay")]
     [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = "client")]
@@ -236,14 +144,7 @@ public class PaymentsController : ControllerBase
     [ProducesResponseType<RestApiErrorResponse>(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> PayInvoice(Guid id)
     {
-        var owner = await GetCurrentOwnerAsync();
-        if (owner == null) return NotFound();
-
-        var payment = await _context.Payments
-            .Include(p => p.ServiceOrder)
-                .ThenInclude(so => so!.Vehicle)
-            .FirstOrDefaultAsync(p => p.Id == id && p.ServiceOrder!.Vehicle!.OwnerId == owner.Id);
-
+        var payment = await _bll.Payments.FindWithDetailsForUserAsync(id, GetCurrentUserId());
         if (payment == null) return NotFound();
 
         if (payment.Status != PaymentStatus.Pending)
@@ -255,13 +156,8 @@ public class PaymentsController : ControllerBase
             });
         }
 
-        payment.Status = PaymentStatus.Paid;
-        payment.PaidAt = DateTime.UtcNow;
-        payment.UpdatedAt = DateTime.UtcNow;
-
-        _context.Entry(payment).State = EntityState.Modified;
-        await _context.SaveChangesAsync();
-
+        await _bll.Payments.MarkAsPaidAsync(payment.Id);
+        await _bll.SaveChangesAsync();
         return NoContent();
     }
 }

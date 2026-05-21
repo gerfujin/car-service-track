@@ -1,5 +1,5 @@
-using App.DAL.EF;
-using App.Domain;
+using App.BLL;
+using App.BLL.DTO;
 using App.DTO.v1;
 using App.DTO.v1.Vehicle;
 using Asp.Versioning;
@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using WebApp.Mappers;
 
 namespace WebApp.ApiControllers;
 
@@ -17,11 +18,11 @@ namespace WebApp.ApiControllers;
 [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
 public class VehiclesController : ControllerBase
 {
-    private readonly AppDbContext _context;
+    private readonly IAppBll _bll;
 
-    public VehiclesController(AppDbContext context)
+    public VehiclesController(IAppBll bll)
     {
-        _context = context;
+        _bll = bll;
     }
 
     private Guid GetCurrentUserId()
@@ -29,13 +30,6 @@ public class VehiclesController : ControllerBase
         var userId = IdentityHelpers.GetUserId(User);
         if (userId == null) throw new UnauthorizedAccessException();
         return userId.Value;
-    }
-
-    private async Task<Owner?> GetCurrentOwnerAsync()
-    {
-        var userId = GetCurrentUserId();
-        return await _context.Owners
-            .FirstOrDefaultAsync(o => o.AppUserId == userId);
     }
 
     private bool IsAdmin() => User.IsInRole("admin");
@@ -52,32 +46,21 @@ public class VehiclesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<IEnumerable<VehicleDto>>> GetVehicles()
     {
-        IQueryable<Vehicle> query = _context.Vehicles;
+        IEnumerable<BllVehicle> vehicles;
 
         if (!IsAdmin() && !IsMechanic())
         {
-            // Client: IDOR — own vehicles only
-            var owner = await GetCurrentOwnerAsync();
-            if (owner == null) return Ok(new List<VehicleDto>());
-            query = query.Where(v => v.OwnerId == owner.Id);
+            // Client: IDOR — own vehicles only (empty list if no owner profile yet).
+            // Owner -> AppUser filtering now lives in the repository query.
+            vehicles = await _bll.Vehicles.AllByUserAsync(GetCurrentUserId());
+        }
+        else
+        {
+            vehicles = await _bll.Vehicles.AllAsync();
         }
 
-        var vehicles = await query
-            .Select(v => new VehicleDto
-            {
-                Id = v.Id,
-                Make = v.Make,
-                Model = v.Model,
-                Year = v.Year,
-                LicensePlate = v.LicensePlate,
-                Vin = v.Vin,
-                Mileage = v.Mileage,
-                Color = v.Color,
-                OwnerId = v.OwnerId
-            })
-            .ToListAsync();
-
-        return Ok(vehicles);
+        var result = vehicles.Select(VehicleApiMapper.ToApiDto).ToList();
+        return Ok(result);
     }
 
     /// <summary>
@@ -92,38 +75,26 @@ public class VehiclesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<VehicleDto>> GetVehicle(Guid id)
     {
-        IQueryable<Vehicle> query = _context.Vehicles.Where(v => v.Id == id);
+        BllVehicle? vehicle;
 
         if (!IsAdmin() && !IsMechanic())
         {
-            var owner = await GetCurrentOwnerAsync();
-            if (owner == null) return NotFound();
-            query = query.Where(v => v.OwnerId == owner.Id);
+            // Client: IDOR — must be one of the caller's own vehicles.
+            vehicle = await _bll.Vehicles.FindByUserAsync(id, GetCurrentUserId());
+        }
+        else
+        {
+            vehicle = await _bll.Vehicles.FindAsync(id);
         }
 
-        var vehicle = await query
-            .Select(v => new VehicleDto
-            {
-                Id = v.Id,
-                Make = v.Make,
-                Model = v.Model,
-                Year = v.Year,
-                LicensePlate = v.LicensePlate,
-                Vin = v.Vin,
-                Mileage = v.Mileage,
-                Color = v.Color,
-                OwnerId = v.OwnerId
-            })
-            .FirstOrDefaultAsync();
-
         if (vehicle == null) return NotFound();
-        return Ok(vehicle);
+        return Ok(VehicleApiMapper.ToApiDto(vehicle));
     }
 
     /// <summary>
     /// Create a new vehicle.
     /// Admin: can create for any owner (uses own profile).
-    /// Client: creates for themselves.
+    /// Client: creates for themselves. Lazily creates an Owner profile if none exists yet.
     /// Mechanic: not allowed.
     /// </summary>
     [HttpPost]
@@ -137,50 +108,16 @@ public class VehiclesController : ControllerBase
     {
         var userId = GetCurrentUserId();
 
-        // Get or create owner profile
-        var owner = await _context.Owners.FirstOrDefaultAsync(o => o.AppUserId == userId);
-        if (owner == null)
-        {
-            var user = await _context.Users.FindAsync(userId);
-            owner = new Owner
-            {
-                AppUserId = userId,
-                FirstName = user?.UserName ?? "Unknown",
-                LastName = ""
-            };
-            _context.Owners.Add(owner);
-            await _context.SaveChangesAsync();
-        }
+        // EnsureForUserAsync: returns existing Owner, or stages a new one (no intermediate save).
+        // Email from JWT claims replaces the old _context.Users.FindAsync lookup.
+        // EF inserts Owner before Vehicle in the same transaction (FK dependency ordering).
+        var owner = await _bll.Owners.EnsureForUserAsync(
+            userId, IdentityHelpers.GetUserEmail(User) ?? "Unknown");
 
-        var vehicle = new Vehicle
-        {
-            Make = dto.Make,
-            Model = dto.Model,
-            Year = dto.Year,
-            LicensePlate = dto.LicensePlate,
-            Vin = dto.Vin,
-            Mileage = dto.Mileage,
-            Color = dto.Color,
-            OwnerId = owner.Id
-        };
+        var created = _bll.Vehicles.Add(VehicleApiMapper.ToBll(dto, owner.Id));
+        await _bll.SaveChangesAsync();
 
-        _context.Vehicles.Add(vehicle);
-        await _context.SaveChangesAsync();
-
-        var result = new VehicleDto
-        {
-            Id = vehicle.Id,
-            Make = vehicle.Make,
-            Model = vehicle.Model,
-            Year = vehicle.Year,
-            LicensePlate = vehicle.LicensePlate,
-            Vin = vehicle.Vin,
-            Mileage = vehicle.Mileage,
-            Color = vehicle.Color,
-            OwnerId = vehicle.OwnerId
-        };
-
-        return CreatedAtAction(nameof(GetVehicle), new { id = vehicle.Id }, result);
+        return CreatedAtAction(nameof(GetVehicle), new { id = created.Id }, VehicleApiMapper.ToApiDto(created));
     }
 
     /// <summary>
@@ -198,30 +135,23 @@ public class VehiclesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> UpdateVehicle(Guid id, [FromBody] VehicleCreateDto dto)
     {
-        IQueryable<Vehicle> query = _context.Vehicles.Where(v => v.Id == id);
+        BllVehicle? vehicle;
 
         if (!IsAdmin())
         {
-            // Client: IDOR check
-            var owner = await GetCurrentOwnerAsync();
-            if (owner == null) return NotFound();
-            query = query.Where(v => v.OwnerId == owner.Id);
+            // Client: IDOR — must own the vehicle.
+            vehicle = await _bll.Vehicles.FindByUserAsync(id, GetCurrentUserId());
+        }
+        else
+        {
+            vehicle = await _bll.Vehicles.FindAsync(id);
         }
 
-        var vehicle = await query.FirstOrDefaultAsync();
         if (vehicle == null) return NotFound();
 
-        vehicle.Make = dto.Make;
-        vehicle.Model = dto.Model;
-        vehicle.Year = dto.Year;
-        vehicle.LicensePlate = dto.LicensePlate;
-        vehicle.Vin = dto.Vin;
-        vehicle.Mileage = dto.Mileage;
-        vehicle.Color = dto.Color;
-        vehicle.UpdatedAt = DateTime.UtcNow;
-
-        _context.Entry(vehicle).State = EntityState.Modified;
-        await _context.SaveChangesAsync();
+        VehicleApiMapper.ApplyUpdate(vehicle, dto);
+        await _bll.Vehicles.UpdateAsync(vehicle);
+        await _bll.SaveChangesAsync();
 
         return NoContent();
     }
@@ -240,26 +170,27 @@ public class VehiclesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> DeleteVehicle(Guid id)
     {
-        IQueryable<Vehicle> query = _context.Vehicles.Where(v => v.Id == id);
+        BllVehicle? vehicle;
 
         if (!IsAdmin())
         {
-            var owner = await GetCurrentOwnerAsync();
-            if (owner == null) return NotFound();
-            query = query.Where(v => v.OwnerId == owner.Id);
+            vehicle = await _bll.Vehicles.FindByUserAsync(id, GetCurrentUserId());
+        }
+        else
+        {
+            vehicle = await _bll.Vehicles.FindAsync(id);
         }
 
-        var vehicle = await query.FirstOrDefaultAsync();
         if (vehicle == null) return NotFound();
 
-        var hasOrders = await _context.ServiceOrders.AnyAsync(so => so.VehicleId == id);
-        if (hasOrders)
+        // Business rule lives in the BLL now (DB-level EXISTS query).
+        if (!await _bll.Vehicles.CanDeleteAsync(id))
             return BadRequest(new { message = "Cannot delete vehicle with existing service orders." });
 
         try
         {
-            _context.Vehicles.Remove(vehicle);
-            await _context.SaveChangesAsync();
+            _bll.Vehicles.Remove(vehicle);
+            await _bll.SaveChangesAsync();
         }
         catch (DbUpdateException)
         {

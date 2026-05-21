@@ -1,8 +1,7 @@
-using App.DAL.EF;
-using App.DTO.v1;
+using App.BLL;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using WebApp.Mappers;
 
 namespace WebApp.ApiControllers;
 
@@ -11,11 +10,11 @@ namespace WebApp.ApiControllers;
 [Route("/api/v{version:apiVersion}/[controller]")]
 public class WorkshopsController : ControllerBase
 {
-    private readonly AppDbContext _context;
+    private readonly IAppBll _bll;
 
-    public WorkshopsController(AppDbContext context)
+    public WorkshopsController(IAppBll bll)
     {
-        _context = context;
+        _bll = bll;
     }
 
     /// <summary>Get all workshops (public)</summary>
@@ -24,16 +23,9 @@ public class WorkshopsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetWorkshops()
     {
-        var workshops = await _context.Workshops
-            .Select(w => new
-            {
-                w.Id,
-                Name = w.Name.ToString(),
-                Address = w.Address.ToString(),
-                w.Phone,
-                w.Email
-            })
-            .ToListAsync();
+        var workshops = (await _bll.Workshops.AllAsync())
+            .Select(WorkshopApiMapper.ToApiDto)
+            .ToList();
 
         return Ok(workshops);
     }
@@ -45,19 +37,8 @@ public class WorkshopsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetWorkshop(Guid id)
     {
-        var workshop = await _context.Workshops
-            .Where(w => w.Id == id)
-            .Select(w => new
-            {
-                w.Id,
-                Name = w.Name.ToString(),
-                Address = w.Address.ToString(),
-                w.Phone,
-                w.Email
-            })
-            .FirstOrDefaultAsync();
-
+        var workshop = await _bll.Workshops.FindAsync(id);
         if (workshop == null) return NotFound();
-        return Ok(workshop);
+        return Ok(WorkshopApiMapper.ToApiDto(workshop));
     }
 }
