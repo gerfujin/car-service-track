@@ -241,7 +241,12 @@ static void SetupAppData(IApplicationBuilder app, IWebHostEnvironment env, IConf
 
     using var context = serviceScope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-    WaitDbConnection(context, logger);
+    // Integration tests run against an in-memory SQLite database and replace the
+    // DbContext registration, so there is no PostgreSQL server to wait for.
+    if (!env.IsEnvironment("Testing"))
+    {
+        WaitDbConnection(context, logger);
+    }
 
     using var userManager = serviceScope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
     using var roleManager = serviceScope.ServiceProvider.GetRequiredService<RoleManager<AppRole>>();
@@ -329,3 +334,6 @@ static bool IsNonRecoverableConnectionError(Exception exception)
 
     return false;
 }
+
+// Required so that WebApplicationFactory<Program> in integration tests can see the Program class.
+public partial class Program { }

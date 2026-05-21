@@ -1,0 +1,82 @@
+# Instructions
+
+- Following Playwright test failed.
+- Explain why, be concise, respect Playwright best practices.
+- Provide a snippet of code with the fix, if possible.
+
+# Test info
+
+- Name: e2e\tests\auth.spec.ts >> Authentication >> Register with new email redirects to home and shows logout button
+- Location: e2e\tests\auth.spec.ts:32:7
+
+# Error details
+
+```
+Error: page.goto: Protocol error (Page.navigate): Cannot navigate to invalid URL
+Call log:
+  - navigating to "/register", waiting until "load"
+
+```
+
+# Test source
+
+```ts
+  1  | import { Page, expect } from '@playwright/test'
+  2  | 
+  3  | /**
+  4  |  * Page Object for /register
+  5  |  */
+  6  | export class RegisterPage {
+  7  |   constructor(private readonly page: Page) {}
+  8  | 
+  9  |   async goto(): Promise<void> {
+> 10 |     await this.page.goto('/register')
+     |                     ^ Error: page.goto: Protocol error (Page.navigate): Cannot navigate to invalid URL
+  11 |     await expect(this.page.locator('form')).toBeVisible()
+  12 |   }
+  13 | 
+  14 |   async fillFirstName(value: string): Promise<void> {
+  15 |     await this.page.locator('input[autocomplete="given-name"]').fill(value)
+  16 |   }
+  17 | 
+  18 |   async fillLastName(value: string): Promise<void> {
+  19 |     await this.page.locator('input[autocomplete="family-name"]').fill(value)
+  20 |   }
+  21 | 
+  22 |   async fillEmail(value: string): Promise<void> {
+  23 |     await this.page.locator('input[autocomplete="email"]').fill(value)
+  24 |   }
+  25 | 
+  26 |   async fillPassword(value: string): Promise<void> {
+  27 |     await this.page.locator('input[autocomplete="new-password"]').first().fill(value)
+  28 |   }
+  29 | 
+  30 |   async fillConfirmPassword(value: string): Promise<void> {
+  31 |     await this.page.locator('input[autocomplete="new-password"]').nth(1).fill(value)
+  32 |   }
+  33 | 
+  34 |   async submit(): Promise<void> {
+  35 |     await this.page.locator('button[type="submit"]').click()
+  36 |   }
+  37 | 
+  38 |   async register(
+  39 |     email: string,
+  40 |     password: string,
+  41 |     firstname = 'E2E',
+  42 |     lastname = 'Tester',
+  43 |   ): Promise<void> {
+  44 |     await this.goto()
+  45 |     await this.fillFirstName(firstname)
+  46 |     await this.fillLastName(lastname)
+  47 |     await this.fillEmail(email)
+  48 |     await this.fillPassword(password)
+  49 |     await this.fillConfirmPassword(password)
+  50 |     await this.submit()
+  51 |   }
+  52 | 
+  53 |   async expectErrorVisible(): Promise<void> {
+  54 |     await expect(this.page.locator('.alert-danger')).toBeVisible()
+  55 |   }
+  56 | }
+  57 | 
+```
