@@ -42,7 +42,11 @@ public class BaseRepository<TEntity> : IBaseRepository<TEntity>
 
     public virtual void Remove(TEntity entity)
     {
-        DbSet.Remove(entity);
+        // If the same Id is already tracked (e.g. loaded earlier via FindAsync),
+        // use that tracked instance — otherwise EF throws InvalidOperationException
+        // when trying to attach a second instance with the same key.
+        var tracked = DbSet.Local.FirstOrDefault(e => e.Id == entity.Id);
+        DbSet.Remove(tracked ?? entity);
     }
 
     public virtual async Task<bool> ExistsAsync(Guid id)

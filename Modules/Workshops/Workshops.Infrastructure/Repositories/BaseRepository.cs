@@ -42,7 +42,8 @@ public class BaseRepository<TEntity> : IBaseRepository<TEntity>
 
     public virtual void Remove(TEntity entity)
     {
-        DbSet.Remove(entity);
+        var tracked = DbSet.Local.FirstOrDefault(e => e.Id == entity.Id);
+        DbSet.Remove(tracked ?? entity);
     }
 
     public virtual async Task<bool> ExistsAsync(Guid id)
