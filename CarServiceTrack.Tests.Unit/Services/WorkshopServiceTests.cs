@@ -1,31 +1,31 @@
-using App.BLL.DTO;
-using App.BLL.Services;
-using App.DAL.Contracts;
-using App.Domain;
 using Base.Domain;
 using FluentAssertions;
 using Moq;
+using Workshops.Application.DTO;
+using Workshops.Application.Services;
+using Workshops.Contracts;
+using Workshops.Contracts.Repositories;
+using Workshops.Domain;
 
 namespace CarServiceTrack.Tests.Unit.Services;
 
 public class WorkshopServiceTests
 {
-    private readonly Mock<IAppUnitOfWork> _uow = new();
+    private readonly Mock<IWorkshopsUnitOfWork> _uow = new();
     private readonly Mock<IWorkshopRepository> _workshopRepo = new();
-    private readonly Mock<IServiceOrderRepository> _orderRepo = new();
     private readonly WorkshopService _sut;
 
     public WorkshopServiceTests()
     {
         _uow.Setup(u => u.Workshops).Returns(_workshopRepo.Object);
-        _uow.Setup(u => u.ServiceOrders).Returns(_orderRepo.Object);
         _sut = new WorkshopService(_uow.Object);
     }
 
     [Fact]
-    public async Task AllAsync_ReturnsAllMapped()
+    public async Task AllAsync_WhenWorkshopsExist_ReturnsAllMapped()
     {
-        _workshopRepo.Setup(r => r.AllAsync()).ReturnsAsync(new List<Workshop> { MakeWorkshop("Shop A"), MakeWorkshop("Shop B") });
+        _workshopRepo.Setup(r => r.AllAsync())
+            .ReturnsAsync(new List<Workshop> { MakeWorkshop("Shop A"), MakeWorkshop("Shop B") });
 
         var result = (await _sut.AllAsync()).ToList();
 
@@ -56,7 +56,7 @@ public class WorkshopServiceTests
     }
 
     [Fact]
-    public void Add_StagedAndReturnsMapped()
+    public void Add_WithValidEntity_StagedAndReturnsMapped()
     {
         var dto = new BllWorkshop { Id = Guid.NewGuid(), Name = "New Shop", Address = "Main St" };
         var domain = MakeWorkshop("New Shop", dto.Id);
@@ -96,32 +96,24 @@ public class WorkshopServiceTests
     }
 
     [Fact]
-    public async Task CanDeleteAsync_WhenNoOrders_ReturnsTrue()
-    {
-        var id = Guid.NewGuid();
-        _orderRepo.Setup(r => r.AnyByWorkshopAsync(id)).ReturnsAsync(false);
-
-        var result = await _sut.CanDeleteAsync(id);
-
-        result.Should().BeTrue();
-    }
-
-    [Fact]
-    public async Task CanDeleteAsync_WhenOrdersExist_ReturnsFalse()
-    {
-        var id = Guid.NewGuid();
-        _orderRepo.Setup(r => r.AnyByWorkshopAsync(id)).ReturnsAsync(true);
-
-        var result = await _sut.CanDeleteAsync(id);
-
-        result.Should().BeFalse();
-    }
-
-    [Fact]
     public void Remove_DelegatesToRepository()
     {
+        _workshopRepo.Setup(r => r.Remove(It.IsAny<Workshop>()));
+
         _sut.Remove(new BllWorkshop { Id = Guid.NewGuid(), Name = "X", Address = "Y" });
+
         _workshopRepo.Verify(r => r.Remove(It.IsAny<Workshop>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ExistsAsync_WhenWorkshopExists_ReturnsTrue()
+    {
+        var id = Guid.NewGuid();
+        _workshopRepo.Setup(r => r.ExistsAsync(id)).ReturnsAsync(true);
+
+        var result = await _sut.ExistsAsync(id);
+
+        result.Should().BeTrue();
     }
 
     private static Workshop MakeWorkshop(string name, Guid? id = null) =>

@@ -2,15 +2,10 @@ using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using System.Text.Json.Serialization;
-using App.BLL;
-using App.DAL.Contracts;
-using App.DAL.EF;
 using Orders.Infrastructure;
 using Users.Infrastructure;
+using Users.Domain.Identity;
 using Workshops.Infrastructure;
-using App.DAL.EF.Repositories;
-using App.DAL.EF.Seeding;
-using App.Domain.Identity;
 using Asp.Versioning;
 using Asp.Versioning.ApiExplorer;
 using Microsoft.AspNetCore.DataProtection;
@@ -30,25 +25,6 @@ var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ??
                        throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 
-builder.Services
-    .AddDbContext<AppDbContext>(options => options
-        .UseNpgsql(
-            connectionString,
-            o => { o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery); }
-        )
-        .ConfigureWarnings(w =>
-            w.Throw(RelationalEventId.MultipleCollectionIncludeWarning)
-        )
-        .EnableDetailedErrors()
-        .EnableSensitiveDataLogging()
-        .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTrackingWithIdentityResolution)
-    );
-
-// Clean architecture layers: DAL UnitOfWork + BLL facade.
-// Scoped lifetime matches AppDbContext (registered above), which AppUnitOfWork depends on.
-builder.Services.AddScoped<IAppUnitOfWork, AppUnitOfWork>();
-builder.Services.AddScoped<IAppBll, AppBll>();
-
 // Modular monolith: each module registers its own MediatR handlers and services.
 builder.Services.AddUsersModule();
 builder.Services.AddWorkshopsModule();
@@ -59,12 +35,11 @@ builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 // using Microsoft.AspNetCore.DataProtection;
 builder.Services
-    .AddDataProtection()
-    .PersistKeysToDbContext<AppDbContext>();
+    .AddDataProtection();
 
 builder.Services.AddIdentity<AppUser, AppRole>(options => options.SignIn.RequireConfirmedAccount = false)
     .AddDefaultUI()
-    .AddEntityFrameworkStores<AppDbContext>()
+    .AddEntityFrameworkStores<UsersDbContext>()
     .AddDefaultTokenProviders();
 
 JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear(); // => remove default claims
@@ -247,13 +222,15 @@ static void SetupAppData(IApplicationBuilder app, IWebHostEnvironment env, IConf
         .CreateScope();
     var logger = serviceScope.ServiceProvider.GetRequiredService<ILogger<IApplicationBuilder>>();
 
-    using var context = serviceScope.ServiceProvider.GetRequiredService<AppDbContext>();
+    using var usersContext = serviceScope.ServiceProvider.GetRequiredService<UsersDbContext>();
+    using var workshopsContext = serviceScope.ServiceProvider.GetRequiredService<WorkshopsDbContext>();
+    using var ordersContext = serviceScope.ServiceProvider.GetRequiredService<OrdersDbContext>();
 
     // Integration tests run against an in-memory SQLite database and replace the
     // DbContext registration, so there is no PostgreSQL server to wait for.
     if (!env.IsEnvironment("Testing"))
     {
-        WaitDbConnection(context, logger);
+        WaitDbConnection(usersContext, logger);
     }
 
     using var userManager = serviceScope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
@@ -262,29 +239,35 @@ static void SetupAppData(IApplicationBuilder app, IWebHostEnvironment env, IConf
     if (configuration.GetValue<bool>("DataInitialization:DropDatabase"))
     {
         logger.LogWarning("DropDatabase");
-        AppDataInit.DeleteDatabase(context);
+        usersContext.Database.EnsureDeleted();
+        workshopsContext.Database.EnsureDeleted();
+        ordersContext.Database.EnsureDeleted();
     }
 
     if (configuration.GetValue<bool>("DataInitialization:MigrateDatabase"))
     {
-        logger.LogInformation("MigrateDatabase");
-        AppDataInit.MigrateDatabase(context);
+        logger.LogInformation("MigrateDatabase: users schema");
+        usersContext.Database.Migrate();
+        logger.LogInformation("MigrateDatabase: workshops schema");
+        workshopsContext.Database.Migrate();
+        logger.LogInformation("MigrateDatabase: orders schema");
+        ordersContext.Database.Migrate();
     }
 
     if (configuration.GetValue<bool>("DataInitialization:SeedIdentity"))
     {
         logger.LogInformation("SeedIdentity");
-        AppDataInit.SeedIdentity(userManager, roleManager);
+        SeedIdentity(userManager, roleManager, logger);
     }
 
     if (configuration.GetValue<bool>("DataInitialization:SeedData"))
     {
-        logger.LogInformation("SeedData");
-        AppDataInit.SeedAppData(context);
+        logger.LogInformation("SeedData: workshops module");
+        SeedWorkshopsData(workshopsContext, logger);
     }
 }
 
-static void WaitDbConnection(AppDbContext ctx, ILogger<IApplicationBuilder> logger)
+static void WaitDbConnection(UsersDbContext ctx, ILogger logger)
 {
     while (true)
     {
@@ -313,6 +296,165 @@ static void WaitDbConnection(AppDbContext ctx, ILogger<IApplicationBuilder> logg
             logger.LogWarning("Waiting for db connection. Sleep 1 sec");
             System.Threading.Thread.Sleep(1000);
         }
+    }
+}
+
+static void SeedIdentity(UserManager<AppUser> userManager, RoleManager<AppRole> roleManager, ILogger logger)
+{
+    foreach (var roleName in new[] { "admin", "client", "mechanic" })
+    {
+        if (!roleManager.RoleExistsAsync(roleName).GetAwaiter().GetResult())
+        {
+            var createRole = roleManager.CreateAsync(new AppRole { Name = roleName }).GetAwaiter().GetResult();
+            if (!createRole.Succeeded)
+            {
+                logger.LogWarning("Failed to create role {Role}: {Errors}",
+                    roleName,
+                    string.Join(", ", createRole.Errors.Select(e => e.Description)));
+            }
+        }
+    }
+
+    // Seed default users (matching A4 InitialData)
+    var seedUsers = new[]
+    {
+        (email: "admin@carservice.ee",    password: "Admin.12345",  role: "admin"),
+        (email: "mechanic@carservice.ee", password: "Mech.12345",   role: "mechanic"),
+        (email: "client@carservice.ee",   password: "Client.12345", role: "client"),
+    };
+
+    foreach (var (email, password, role) in seedUsers)
+    {
+        var existing = userManager.FindByEmailAsync(email).GetAwaiter().GetResult();
+        if (existing != null) continue;
+
+        var user = new AppUser { Email = email, UserName = email, EmailConfirmed = true };
+        var result = userManager.CreateAsync(user, password).GetAwaiter().GetResult();
+        if (!result.Succeeded)
+        {
+            logger.LogWarning("Failed to create seed user {Email}: {Errors}",
+                email,
+                string.Join(", ", result.Errors.Select(e => e.Description)));
+            continue;
+        }
+
+        var roleResult = userManager.AddToRoleAsync(user, role).GetAwaiter().GetResult();
+        if (!roleResult.Succeeded)
+        {
+            logger.LogWarning("Failed to assign role {Role} to {Email}: {Errors}",
+                role, email,
+                string.Join(", ", roleResult.Errors.Select(e => e.Description)));
+        }
+        else
+        {
+            logger.LogInformation("Seeded user {Email} with role {Role}", email, role);
+        }
+    }
+}
+
+static void SeedWorkshopsData(WorkshopsDbContext context, ILogger logger)
+{
+    if (!context.Workshops.Any())
+    {
+        context.Workshops.AddRange(
+            new Workshops.Domain.Workshop
+            {
+                Name = new Base.Domain.LangStr("AutoFix Tallinn", "en"),
+                Address = new Base.Domain.LangStr("Pärnu mnt 12, Tallinn", "en"),
+                Phone = "+372 5555 1111",
+                Email = "info@autofix.ee"
+            },
+            new Workshops.Domain.Workshop
+            {
+                Name = new Base.Domain.LangStr("SpeedGarage Tartu", "en"),
+                Address = new Base.Domain.LangStr("Riia 15, Tartu", "en"),
+                Phone = "+372 5555 2222",
+                Email = "info@speedgarage.ee"
+            }
+        );
+        context.SaveChanges();
+        logger.LogInformation("Seeded workshops");
+    }
+
+    if (!context.Services.Any())
+    {
+        context.Services.AddRange(
+            new Workshops.Domain.Service
+            {
+                Name = new Base.Domain.LangStr("Oil Change", "en"),
+                Description = new Base.Domain.LangStr("Full synthetic oil change with filter replacement", "en"),
+                BasePrice = 49.99m
+            },
+            new Workshops.Domain.Service
+            {
+                Name = new Base.Domain.LangStr("Brake Inspection", "en"),
+                Description = new Base.Domain.LangStr("Complete brake system inspection and adjustment", "en"),
+                BasePrice = 39.99m
+            },
+            new Workshops.Domain.Service
+            {
+                Name = new Base.Domain.LangStr("Tire Rotation", "en"),
+                Description = new Base.Domain.LangStr("Rotate all four tires for even wear", "en"),
+                BasePrice = 29.99m
+            },
+            new Workshops.Domain.Service
+            {
+                Name = new Base.Domain.LangStr("Engine Diagnostics", "en"),
+                Description = new Base.Domain.LangStr("Full computer diagnostics scan", "en"),
+                BasePrice = 59.99m
+            },
+            new Workshops.Domain.Service
+            {
+                Name = new Base.Domain.LangStr("Air Filter Replacement", "en"),
+                Description = new Base.Domain.LangStr("Replace engine air filter", "en"),
+                BasePrice = 24.99m
+            }
+        );
+        context.SaveChanges();
+        logger.LogInformation("Seeded services");
+    }
+
+    if (!context.SpareParts.Any())
+    {
+        context.SpareParts.AddRange(
+            new Workshops.Domain.SparePart
+            {
+                Name = new Base.Domain.LangStr("Oil Filter", "en"),
+                PartNumber = "OF-001",
+                UnitPrice = 12.99m,
+                StockQuantity = 50
+            },
+            new Workshops.Domain.SparePart
+            {
+                Name = new Base.Domain.LangStr("Brake Pad Set (Front)", "en"),
+                PartNumber = "BP-F-001",
+                UnitPrice = 45.99m,
+                StockQuantity = 20
+            },
+            new Workshops.Domain.SparePart
+            {
+                Name = new Base.Domain.LangStr("Air Filter", "en"),
+                PartNumber = "AF-001",
+                UnitPrice = 18.99m,
+                StockQuantity = 30
+            },
+            new Workshops.Domain.SparePart
+            {
+                Name = new Base.Domain.LangStr("Spark Plug Set", "en"),
+                PartNumber = "SP-001",
+                UnitPrice = 32.99m,
+                StockQuantity = 40
+            },
+            new Workshops.Domain.SparePart
+            {
+                Name = new Base.Domain.LangStr("Windshield Wiper Blades", "en"),
+                PartNumber = "WW-001",
+                UnitPrice = 22.99m,
+                StockQuantity = 25
+            }
+        );
+        context.SaveChanges();
+        logger.LogInformation("Seeded spare parts");
     }
 }
 

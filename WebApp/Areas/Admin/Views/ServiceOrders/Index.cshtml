@@ -38,10 +38,10 @@
                             @{
                                 var badgeClass = o.Status switch
                                 {
-                                    App.Domain.Enums.ServiceOrderStatus.Pending => "bg-warning text-dark",
-                                    App.Domain.Enums.ServiceOrderStatus.InProgress => "bg-primary",
-                                    App.Domain.Enums.ServiceOrderStatus.Completed => "bg-success",
-                                    App.Domain.Enums.ServiceOrderStatus.Cancelled => "bg-danger",
+                                    Orders.Domain.Enums.ServiceOrderStatus.Pending => "bg-warning text-dark",
+                                    Orders.Domain.Enums.ServiceOrderStatus.InProgress => "bg-primary",
+                                    Orders.Domain.Enums.ServiceOrderStatus.Completed => "bg-success",
+                                    Orders.Domain.Enums.ServiceOrderStatus.Cancelled => "bg-danger",
                                     _ => "bg-secondary"
                                 };
                             }
@@ -73,3 +73,4 @@
         </table>
     </div>
 </div>
+

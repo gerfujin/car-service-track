@@ -1,7 +1,8 @@
-using App.BLL;
+using Orders.Domain.Enums;
 using Base.Helpers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Orders.Application.Services;
 using WebApp.ViewModels.Client;
 
 namespace WebApp.Controllers;
@@ -9,11 +10,11 @@ namespace WebApp.Controllers;
 [Authorize]
 public class PaymentsController : Controller
 {
-    private readonly IAppBll _bll;
+    private readonly IPaymentService _paymentService;
 
-    public PaymentsController(IAppBll bll)
+    public PaymentsController(IPaymentService paymentService)
     {
-        _bll = bll;
+        _paymentService = paymentService;
     }
 
     private bool IsAdmin() => User.IsInRole("admin");
@@ -25,15 +26,15 @@ public class PaymentsController : Controller
         var userId = IdentityHelpers.GetUserId(User);
         if (userId == null) return RedirectToAction("Login", "Account", new { area = "Identity" });
 
-        IEnumerable<App.BLL.DTO.BllPayment> bllPayments;
+        IEnumerable<Orders.Application.DTO.BllPayment> bllPayments;
 
         if (IsAdmin() || IsMechanic())
         {
-            bllPayments = await _bll.Payments.AllWithDetailsAsync();
+            bllPayments = await _paymentService.AllWithDetailsAsync();
         }
         else
         {
-            bllPayments = await _bll.Payments.AllByUserAsync(userId.Value);
+            bllPayments = await _paymentService.AllByUserAsync(userId.Value);
         }
 
         var payments = bllPayments
@@ -44,7 +45,7 @@ public class PaymentsController : Controller
         return View(new PaymentClientListViewModel { Payments = payments });
     }
 
-    private static PaymentClientViewModel ToClientVm(App.BLL.DTO.BllPayment p) => new()
+    private static PaymentClientViewModel ToClientVm(Orders.Application.DTO.BllPayment p) => new()
     {
         Id = p.Id,
         Amount = p.Amount,

@@ -1,15 +1,16 @@
-using App.BLL.DTO;
-using App.BLL.Services;
-using App.DAL.Contracts;
-using App.Domain;
 using FluentAssertions;
 using Moq;
+using Workshops.Application.DTO;
+using Workshops.Application.Services;
+using Workshops.Contracts;
+using Workshops.Contracts.Repositories;
+using Workshops.Domain;
 
 namespace CarServiceTrack.Tests.Unit.Services;
 
 public class MechanicServiceTests
 {
-    private readonly Mock<IAppUnitOfWork> _uow = new();
+    private readonly Mock<IWorkshopsUnitOfWork> _uow = new();
     private readonly Mock<IMechanicRepository> _repo = new();
     private readonly MechanicService _sut;
 
@@ -20,9 +21,10 @@ public class MechanicServiceTests
     }
 
     [Fact]
-    public async Task AllAsync_ReturnsAllMapped()
+    public async Task AllAsync_WhenMechanicsExist_ReturnsAllMapped()
     {
-        _repo.Setup(r => r.AllAsync()).ReturnsAsync(new List<Mechanic> { MakeMechanic("Alice"), MakeMechanic("Bob") });
+        _repo.Setup(r => r.AllAsync())
+            .ReturnsAsync(new List<Mechanic> { MakeMechanic("Alice"), MakeMechanic("Bob") });
 
         var result = (await _sut.AllAsync()).ToList();
 
@@ -53,7 +55,7 @@ public class MechanicServiceTests
     }
 
     [Fact]
-    public void Add_StagedAndReturnsMapped()
+    public void Add_WithValidEntity_StagedAndReturnsMapped()
     {
         var dto = new BllMechanic { Id = Guid.NewGuid(), FirstName = "Dave", LastName = "Jones" };
         _repo.Setup(r => r.Add(It.IsAny<Mechanic>())).Returns(MakeMechanic("Dave", dto.Id));
@@ -100,11 +102,14 @@ public class MechanicServiceTests
     }
 
     [Fact]
-    public async Task ExistsAsync_WhenExists_ReturnsTrue()
+    public async Task ExistsAsync_WhenMechanicExists_ReturnsTrue()
     {
         var id = Guid.NewGuid();
         _repo.Setup(r => r.ExistsAsync(id)).ReturnsAsync(true);
-        (await _sut.ExistsAsync(id)).Should().BeTrue();
+
+        var result = await _sut.ExistsAsync(id);
+
+        result.Should().BeTrue();
     }
 
     private static Mechanic MakeMechanic(string firstName, Guid? id = null) =>

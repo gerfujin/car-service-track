@@ -2,7 +2,6 @@ stages:
   - test
   - deploy
 
-# ── .NET unit + integration tests ─────────────────────────────────────────────
 dotnet-tests:
   stage: test
   image: mcr.microsoft.com/dotnet/sdk:10.0
@@ -13,18 +12,20 @@ dotnet-tests:
     - shared
   script:
     - dotnet restore pesonal.sln
-    - dotnet test CarServiceTrack.Tests.Unit/CarServiceTrack.Tests.Unit.csproj
-        --configuration Release
-        --no-restore
-        --logger "junit;LogFilePath=TestResults/unit-results.xml"
-        --collect:"XPlat Code Coverage"
-        --results-directory TestResults/unit
-    - dotnet test CarServiceTrack.Tests.Integration/CarServiceTrack.Tests.Integration.csproj
-        --configuration Release
-        --no-restore
-        --logger "junit;LogFilePath=TestResults/integration-results.xml"
-        --collect:"XPlat Code Coverage"
-        --results-directory TestResults/integration
+    - >
+      dotnet test CarServiceTrack.Tests.Unit/CarServiceTrack.Tests.Unit.csproj
+      --configuration Release
+      --no-restore
+      --logger "junit;LogFilePath=TestResults/unit-results.xml"
+      --collect:"XPlat Code Coverage"
+      --results-directory TestResults/unit
+    - >
+      dotnet test CarServiceTrack.Tests.Integration/CarServiceTrack.Tests.Integration.csproj
+      --configuration Release
+      --no-restore
+      --logger "junit;LogFilePath=TestResults/integration-results.xml"
+      --collect:"XPlat Code Coverage"
+      --results-directory TestResults/integration
   artifacts:
     when: always
     reports:
@@ -35,7 +36,6 @@ dotnet-tests:
       - TestResults/
     expire_in: 7 days
 
-# ── Playwright E2E tests ──────────────────────────────────────────────────────
 e2e-tests:
   stage: test
   when: manual
@@ -46,22 +46,20 @@ e2e-tests:
     - merge_requests
   tags:
     - shared
-  # Start the docker-compose stack before running tests
   before_script:
     - apt-get update -qq && apt-get install -y -qq docker-compose
-    - docker compose -p e2e up --build -d
-    # Wait until the frontend is reachable
+    - docker compose -p a5-e2e up --build -d
     - |
       echo "Waiting for services to be ready..."
-      timeout 120 bash -c 'until curl -sf http://localhost:81 > /dev/null; do sleep 3; done'
+      timeout 120 bash -c 'until curl -sf http://localhost:98 > /dev/null; do sleep 3; done'
       echo "Frontend is up."
   script:
     - cd client-app
     - npm ci
     - npx playwright install chromium
-    - APP_BASE_URL=http://localhost:81 API_BASE_URL=http://localhost:80 npx playwright test --config=e2e/playwright.config.ts
+    - APP_BASE_URL=http://localhost:98 API_BASE_URL=http://localhost:99 npx playwright test --config=e2e/playwright.config.ts
   after_script:
-    - docker compose -p e2e down || true
+    - docker compose -p a5-e2e down || true
   artifacts:
     when: always
     reports:
@@ -71,7 +69,6 @@ e2e-tests:
       - client-app/playwright-results.xml
     expire_in: 7 days
 
-# ── Deploy ────────────────────────────────────────────────────────────────────
 deploy:
   stage: deploy
   only:
@@ -79,5 +76,5 @@ deploy:
   tags:
     - shared
   script:
-    - docker compose -p personalproject down || true
-    - docker compose -p personalproject up --build --remove-orphans -d
+    - docker compose -p a5project down || true
+    - docker compose -p a5project up --build --remove-orphans -d

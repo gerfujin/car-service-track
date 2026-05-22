@@ -1,6 +1,7 @@
-using App.BLL;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Orders.Contracts.Queries;
 using WebApp.Areas.Admin.ViewModels;
 
 namespace WebApp.Areas.Admin.Controllers;
@@ -9,16 +10,16 @@ namespace WebApp.Areas.Admin.Controllers;
 [Authorize(Roles = "admin")]
 public class DashboardController : Controller
 {
-    private readonly IAppBll _bll;
+    private readonly IMediator _mediator;
 
-    public DashboardController(IAppBll bll)
+    public DashboardController(IMediator mediator)
     {
-        _bll = bll;
+        _mediator = mediator;
     }
 
     public async Task<IActionResult> Index()
     {
-        var stats = await _bll.ServiceOrders.GetAdminDashboardStatsAsync();
+        var stats = await _mediator.Send(new GetAdminDashboardStatsQuery());
 
         var vm = new DashboardViewModel
         {

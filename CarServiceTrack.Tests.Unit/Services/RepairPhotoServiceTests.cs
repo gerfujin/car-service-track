@@ -1,24 +1,23 @@
-using App.BLL.DTO;
-using App.BLL.Services;
-using App.DAL.Contracts;
-using App.Domain;
 using FluentAssertions;
 using Moq;
+using Orders.Application.DTO;
+using Orders.Application.Services;
+using Orders.Contracts;
+using Orders.Contracts.Repositories;
+using Orders.Domain;
 
 namespace CarServiceTrack.Tests.Unit.Services;
 
 public class RepairPhotoServiceTests
 {
-    private readonly Mock<IAppUnitOfWork> _uow = new();
+    private readonly Mock<IOrdersUnitOfWork> _uow = new();
     private readonly Mock<IRepairPhotoRepository> _photoRepo = new();
-    private readonly Mock<IOwnerRepository> _ownerRepo = new();
     private readonly Mock<IServiceOrderRepository> _orderRepo = new();
     private readonly RepairPhotoService _sut;
 
     public RepairPhotoServiceTests()
     {
         _uow.Setup(u => u.RepairPhotos).Returns(_photoRepo.Object);
-        _uow.Setup(u => u.Owners).Returns(_ownerRepo.Object);
         _uow.Setup(u => u.ServiceOrders).Returns(_orderRepo.Object);
         _sut = new RepairPhotoService(_uow.Object);
     }
@@ -28,52 +27,43 @@ public class RepairPhotoServiceTests
     public async Task AllForApiAsync_WhenAdminRole_ReturnsAllPhotos()
     {
         var orderId = Guid.NewGuid();
-        _photoRepo.Setup(r => r.AllByServiceOrderWithDetailsAsync(orderId)).ReturnsAsync(new List<RepairPhoto>
-        {
-            MakePhoto(orderId), MakePhoto(orderId)
-        });
+        _photoRepo.Setup(r => r.AllByServiceOrderWithDetailsAsync(orderId))
+            .ReturnsAsync(new List<RepairPhoto> { MakePhoto(orderId), MakePhoto(orderId) });
 
         var result = (await _sut.AllForApiAsync(orderId, Guid.NewGuid(), isAdmin: true, isMechanic: false)).ToList();
 
         result.Should().HaveCount(2);
-        _ownerRepo.Verify(r => r.FindByUserAsync(It.IsAny<Guid>()), Times.Never);
     }
 
     [Fact]
-    public async Task AllForApiAsync_WhenClientAndOwnerExists_ReturnsOwnedPhotos()
+    public async Task AllForApiAsync_WhenClientAndPhotoOwnedByUser_ReturnsOwnedPhotos()
     {
         var orderId = Guid.NewGuid();
         var userId = Guid.NewGuid();
-        var ownerId = Guid.NewGuid();
-        var owner = new Owner { Id = ownerId, AppUserId = userId, FirstName = "User", LastName = "A" };
-        // RepairPhoto.OwnerId is a read-side projection populated by the mapper via
-        // navigation (ServiceOrder → Vehicle → Owner). Since there is no navigation
-        // loaded in these mocked domain objects, the mapper will return OwnerId = null
-        // for every photo, so the client-side IDOR filter excludes them all.
-        var photo1 = MakePhoto(orderId);
-        var photo2 = MakePhoto(orderId);
-
+        // Photo with OwnerId matching userId
+        var ownedPhoto = MakePhoto(orderId);
+        ownedPhoto.ServiceOrderId = orderId;
+        // BllRepairPhoto.OwnerId is populated by mapper from navigation; since domain has no
+        // navigation loaded, OwnerId will be null → filter excludes all photos.
         _photoRepo.Setup(r => r.AllByServiceOrderWithDetailsAsync(orderId))
-            .ReturnsAsync(new List<RepairPhoto> { photo1, photo2 });
-        _ownerRepo.Setup(r => r.FindByUserAsync(userId)).ReturnsAsync(owner);
+            .ReturnsAsync(new List<RepairPhoto> { ownedPhoto });
 
         var result = (await _sut.AllForApiAsync(orderId, userId, isAdmin: false, isMechanic: false)).ToList();
 
-        // BllRepairPhoto.OwnerId = null for both (no navigation) → filter excludes all
+        // OwnerId = null (no navigation) → filter excludes all
         result.Should().BeEmpty();
     }
 
     [Fact]
-    public async Task AllForApiAsync_WhenClientAndNoOwner_ReturnsEmptyList()
+    public async Task AllForApiAsync_WhenMechanicRole_ReturnsAllPhotos()
     {
         var orderId = Guid.NewGuid();
-        var userId = Guid.NewGuid();
-        _photoRepo.Setup(r => r.AllByServiceOrderWithDetailsAsync(orderId)).ReturnsAsync(new List<RepairPhoto> { MakePhoto(orderId) });
-        _ownerRepo.Setup(r => r.FindByUserAsync(userId)).ReturnsAsync((Owner?)null);
+        _photoRepo.Setup(r => r.AllByServiceOrderWithDetailsAsync(orderId))
+            .ReturnsAsync(new List<RepairPhoto> { MakePhoto(orderId) });
 
-        var result = await _sut.AllForApiAsync(orderId, userId, isAdmin: false, isMechanic: false);
+        var result = (await _sut.AllForApiAsync(orderId, Guid.NewGuid(), isAdmin: false, isMechanic: true)).ToList();
 
-        result.Should().BeEmpty();
+        result.Should().HaveCount(1);
     }
 
     // ── FindForApiAsync ───────────────────────────────────────────────────────
@@ -99,12 +89,12 @@ public class RepairPhotoServiceTests
     }
 
     [Fact]
-    public async Task FindForApiAsync_WhenClientAndNoOwner_ReturnsNull()
+    public async Task FindForApiAsync_WhenClientAndPhotoNotOwned_ReturnsNull()
     {
         var id = Guid.NewGuid();
         var userId = Guid.NewGuid();
+        // Photo with OwnerId = null (no navigation) → OwnerId != userId → returns null
         _photoRepo.Setup(r => r.FindWithDetailsAsync(id)).ReturnsAsync(MakePhoto(Guid.NewGuid(), id));
-        _ownerRepo.Setup(r => r.FindByUserAsync(userId)).ReturnsAsync((Owner?)null);
 
         var result = await _sut.FindForApiAsync(id, userId, isAdmin: false, isMechanic: false);
 

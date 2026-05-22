@@ -38,10 +38,10 @@ else
                                 @{
                                     var badgeClass = payment.Status switch
                                     {
-                                        App.Domain.Enums.PaymentStatus.Pending => "bg-warning text-dark",
-                                        App.Domain.Enums.PaymentStatus.Paid => "bg-success",
-                                        App.Domain.Enums.PaymentStatus.Cancelled => "bg-danger",
-                                        App.Domain.Enums.PaymentStatus.Refunded => "bg-info",
+                                        Orders.Domain.Enums.PaymentStatus.Pending => "bg-warning text-dark",
+                                        Orders.Domain.Enums.PaymentStatus.Paid => "bg-success",
+                                        Orders.Domain.Enums.PaymentStatus.Cancelled => "bg-danger",
+                                        Orders.Domain.Enums.PaymentStatus.Refunded => "bg-info",
                                         _ => "bg-secondary"
                                     };
                                 }
@@ -58,3 +58,4 @@ else
         </div>
     </div>
 }
+

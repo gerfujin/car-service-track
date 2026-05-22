@@ -1,10 +1,10 @@
-using App.Domain.Identity;
 using Base.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using Orders.Domain;
 using Orders.Domain.Enums;
 using Orders.Infrastructure;
+using Users.Domain.Identity;
 using Users.Infrastructure;
 using Workshops.Domain;
 using Workshops.Infrastructure;

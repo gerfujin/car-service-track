@@ -1,26 +1,30 @@
-using App.BLL.DTO;
-using App.BLL.Services;
-using App.DAL.Contracts;
-using App.Domain;
-using App.Domain.Enums;
-using Base.Domain;
 using FluentAssertions;
+using MediatR;
 using Moq;
+using Orders.Application.DTO;
+using Orders.Application.Services;
+using Orders.Contracts;
+using Orders.Contracts.Repositories;
+using Orders.Domain;
+using Orders.Domain.Enums;
+using Users.Contracts.Queries;
+using Workshops.Contracts.Queries;
 
 namespace CarServiceTrack.Tests.Unit.Services;
 
 public class PaymentServiceTests
 {
-    private readonly Mock<IAppUnitOfWork> _uow = new();
+    private readonly Mock<IOrdersUnitOfWork> _uow = new();
     private readonly Mock<IPaymentRepository> _paymentRepo = new();
     private readonly Mock<IServiceOrderRepository> _orderRepo = new();
+    private readonly Mock<ISender> _sender = new();
     private readonly PaymentService _sut;
 
     public PaymentServiceTests()
     {
         _uow.Setup(u => u.Payments).Returns(_paymentRepo.Object);
         _uow.Setup(u => u.ServiceOrders).Returns(_orderRepo.Object);
-        _sut = new PaymentService(_uow.Object);
+        _sut = new PaymentService(_uow.Object, _sender.Object);
     }
 
     // ── FindByServiceOrderAsync ───────────────────────────────────────────────
@@ -30,6 +34,10 @@ public class PaymentServiceTests
         var orderId = Guid.NewGuid();
         var payment = MakePayment(orderId: orderId);
         _paymentRepo.Setup(r => r.FindByServiceOrderAsync(orderId)).ReturnsAsync(payment);
+        // EnrichPaymentAsync needs the service order
+        _orderRepo.Setup(r => r.FindAsync(orderId)).ReturnsAsync(MakeOrder(orderId));
+        _sender.Setup(s => s.Send(It.IsAny<GetVehicleByIdQuery>(), default)).ReturnsAsync((VehicleDto?)null);
+        _sender.Setup(s => s.Send(It.IsAny<GetWorkshopByIdQuery>(), default)).ReturnsAsync((WorkshopDto?)null);
 
         var result = await _sut.FindByServiceOrderAsync(orderId);
 
@@ -52,11 +60,12 @@ public class PaymentServiceTests
     public async Task CreateForServiceOrderAsync_WithValidOrder_CreatesAndReturnsPayment()
     {
         var orderId = Guid.NewGuid();
-        var ownerId = Guid.NewGuid();
-        var order = MakeOrderWithDetails(orderId, ownerId);
-        _orderRepo.Setup(r => r.FindWithDetailsAsync(orderId)).ReturnsAsync(order);
+        var order = MakeOrder(orderId);
+        _orderRepo.Setup(r => r.FindAsync(orderId)).ReturnsAsync(order);
         _paymentRepo.Setup(r => r.AnyByServiceOrderAsync(orderId)).ReturnsAsync(false);
         _paymentRepo.Setup(r => r.Add(It.IsAny<Payment>())).Returns<Payment>(p => p);
+        _sender.Setup(s => s.Send(It.IsAny<GetVehicleByIdQuery>(), default)).ReturnsAsync((VehicleDto?)null);
+        _sender.Setup(s => s.Send(It.IsAny<GetWorkshopByIdQuery>(), default)).ReturnsAsync((WorkshopDto?)null);
 
         var (payment, error) = await _sut.CreateForServiceOrderAsync(orderId, 150m);
 
@@ -70,7 +79,7 @@ public class PaymentServiceTests
     [Fact]
     public async Task CreateForServiceOrderAsync_WithNonexistentOrder_ReturnsError()
     {
-        _orderRepo.Setup(r => r.FindWithDetailsAsync(It.IsAny<Guid>())).ReturnsAsync((ServiceOrder?)null);
+        _orderRepo.Setup(r => r.FindAsync(It.IsAny<Guid>())).ReturnsAsync((ServiceOrder?)null);
 
         var (payment, error) = await _sut.CreateForServiceOrderAsync(Guid.NewGuid(), 100m);
 
@@ -83,7 +92,7 @@ public class PaymentServiceTests
     public async Task CreateForServiceOrderAsync_WhenPaymentAlreadyExists_ReturnsError()
     {
         var orderId = Guid.NewGuid();
-        _orderRepo.Setup(r => r.FindWithDetailsAsync(orderId)).ReturnsAsync(MakeOrderWithDetails(orderId, Guid.NewGuid()));
+        _orderRepo.Setup(r => r.FindAsync(orderId)).ReturnsAsync(MakeOrder(orderId));
         _paymentRepo.Setup(r => r.AnyByServiceOrderAsync(orderId)).ReturnsAsync(true);
 
         var (payment, error) = await _sut.CreateForServiceOrderAsync(orderId, 100m);
@@ -128,6 +137,9 @@ public class PaymentServiceTests
         var existing = MakePayment(id, PaymentStatus.Pending, orderId);
         _paymentRepo.Setup(r => r.FindAsync(id)).ReturnsAsync(existing);
         _paymentRepo.Setup(r => r.Update(It.IsAny<Payment>())).Returns<Payment>(p => p);
+        _orderRepo.Setup(r => r.FindAsync(orderId)).ReturnsAsync(MakeOrder(orderId));
+        _sender.Setup(s => s.Send(It.IsAny<GetVehicleByIdQuery>(), default)).ReturnsAsync((VehicleDto?)null);
+        _sender.Setup(s => s.Send(It.IsAny<GetWorkshopByIdQuery>(), default)).ReturnsAsync((WorkshopDto?)null);
 
         var dto = new BllPayment { Id = id, Amount = 200m, Status = PaymentStatus.Paid, ServiceOrderId = orderId, PaymentMethod = "Card" };
         var result = await _sut.UpdateAsync(dto);
@@ -175,19 +187,14 @@ public class PaymentServiceTests
             UpdatedAt = DateTime.UtcNow
         };
 
-    private static ServiceOrder MakeOrderWithDetails(Guid id, Guid ownerId)
-    {
-        var vehicle = new Vehicle { Id = Guid.NewGuid(), Make = "BMW", Model = "X5", Year = 2022, LicensePlate = "BM123", OwnerId = ownerId };
-        var workshop = new Workshop { Id = Guid.NewGuid(), Name = new LangStr("Test Workshop", "en"), Address = new LangStr("Addr", "en") };
-        return new ServiceOrder
+    private static ServiceOrder MakeOrder(Guid id) =>
+        new()
         {
             Id = id,
-            VehicleId = vehicle.Id,
-            Vehicle = vehicle,
-            WorkshopId = workshop.Id,
-            Workshop = workshop,
+            VehicleId = Guid.NewGuid(),
+            WorkshopId = Guid.NewGuid(),
+            AppUserId = Guid.NewGuid(),
             Status = ServiceOrderStatus.Completed,
             OrderDate = DateTime.UtcNow
         };
-    }
 }

@@ -1,29 +1,29 @@
-using App.BLL.DTO;
-using App.BLL.Services;
-using App.DAL.Contracts;
-using App.Domain;
-using Base.Domain;
 using FluentAssertions;
+using MediatR;
 using Moq;
+using Orders.Application.DTO;
+using Orders.Application.Services;
+using Orders.Contracts;
+using Orders.Contracts.Repositories;
+using Orders.Domain;
+using Orders.Domain.Enums;
+using Workshops.Contracts.Queries;
 
 namespace CarServiceTrack.Tests.Unit.Services;
 
 public class ServiceOrderPartServiceTests
 {
-    private readonly Mock<IAppUnitOfWork> _uow = new();
+    private readonly Mock<IOrdersUnitOfWork> _uow = new();
     private readonly Mock<IServiceOrderPartRepository> _partRepo = new();
     private readonly Mock<IServiceOrderRepository> _orderRepo = new();
-    private readonly Mock<ISparePartRepository> _spareRepo = new();
-    private readonly Mock<IOwnerRepository> _ownerRepo = new();
+    private readonly Mock<ISender> _sender = new();
     private readonly ServiceOrderPartService _sut;
 
     public ServiceOrderPartServiceTests()
     {
         _uow.Setup(u => u.ServiceOrderParts).Returns(_partRepo.Object);
         _uow.Setup(u => u.ServiceOrders).Returns(_orderRepo.Object);
-        _uow.Setup(u => u.SpareParts).Returns(_spareRepo.Object);
-        _uow.Setup(u => u.Owners).Returns(_ownerRepo.Object);
-        _sut = new ServiceOrderPartService(_uow.Object);
+        _sut = new ServiceOrderPartService(_uow.Object, _sender.Object);
     }
 
     // ── CreateForApiAsync ─────────────────────────────────────────────────────
@@ -33,9 +33,9 @@ public class ServiceOrderPartServiceTests
         var orderId = Guid.NewGuid();
         var spareId = Guid.NewGuid();
         var order = MakeOrder(orderId);
-        var sparePart = MakeSparePart(spareId, 45.99m);
+        var sparePart = new SparePartDto(spareId, "Test Part", "PN-001", null, 45.99m, 10);
         _orderRepo.Setup(r => r.FindAsync(orderId)).ReturnsAsync(order);
-        _spareRepo.Setup(r => r.FindAsync(spareId)).ReturnsAsync(sparePart);
+        _sender.Setup(s => s.Send(It.IsAny<GetSparePartByIdQuery>(), default)).ReturnsAsync(sparePart);
         _partRepo.Setup(r => r.Add(It.IsAny<ServiceOrderPart>())).Returns<ServiceOrderPart>(p => p);
 
         var dto = new BllServiceOrderPart { ServiceOrderId = orderId, SparePartId = spareId, Quantity = 2, UnitPrice = 0 };
@@ -64,7 +64,7 @@ public class ServiceOrderPartServiceTests
     {
         var orderId = Guid.NewGuid();
         _orderRepo.Setup(r => r.FindAsync(orderId)).ReturnsAsync(MakeOrder(orderId));
-        _spareRepo.Setup(r => r.FindAsync(It.IsAny<Guid>())).ReturnsAsync((SparePart?)null);
+        _sender.Setup(s => s.Send(It.IsAny<GetSparePartByIdQuery>(), default)).ReturnsAsync((SparePartDto?)null);
 
         var result = await _sut.CreateForApiAsync(new BllServiceOrderPart { ServiceOrderId = orderId, SparePartId = Guid.NewGuid(), Quantity = 1 });
 
@@ -77,7 +77,8 @@ public class ServiceOrderPartServiceTests
         var orderId = Guid.NewGuid();
         var spareId = Guid.NewGuid();
         _orderRepo.Setup(r => r.FindAsync(orderId)).ReturnsAsync(MakeOrder(orderId));
-        _spareRepo.Setup(r => r.FindAsync(spareId)).ReturnsAsync(MakeSparePart(spareId, 10m));
+        _sender.Setup(s => s.Send(It.IsAny<GetSparePartByIdQuery>(), default))
+            .ReturnsAsync(new SparePartDto(spareId, "Part", null, null, 10m, 5));
 
         var result = await _sut.CreateForApiAsync(new BllServiceOrderPart { ServiceOrderId = orderId, SparePartId = spareId, Quantity = 0 });
 
@@ -90,7 +91,8 @@ public class ServiceOrderPartServiceTests
         var orderId = Guid.NewGuid();
         var spareId = Guid.NewGuid();
         _orderRepo.Setup(r => r.FindAsync(orderId)).ReturnsAsync(MakeOrder(orderId));
-        _spareRepo.Setup(r => r.FindAsync(spareId)).ReturnsAsync(MakeSparePart(spareId, 50m));
+        _sender.Setup(s => s.Send(It.IsAny<GetSparePartByIdQuery>(), default))
+            .ReturnsAsync(new SparePartDto(spareId, "Part", null, null, 50m, 5));
         _partRepo.Setup(r => r.Add(It.IsAny<ServiceOrderPart>())).Returns<ServiceOrderPart>(p => p);
 
         var result = await _sut.CreateForApiAsync(new BllServiceOrderPart { ServiceOrderId = orderId, SparePartId = spareId, Quantity = 1, UnitPrice = 35m });
@@ -152,25 +154,27 @@ public class ServiceOrderPartServiceTests
     public async Task AllForApiAsync_WhenMechanic_ReturnsAllParts()
     {
         var orderId = Guid.NewGuid();
-        _partRepo.Setup(r => r.AllWithDetailsAsync(orderId)).ReturnsAsync(new List<ServiceOrderPart>
-        {
-            MakeServiceOrderPart(Guid.NewGuid(), orderId),
-            MakeServiceOrderPart(Guid.NewGuid(), orderId)
-        });
+        _partRepo.Setup(r => r.AllWithDetailsAsync(orderId))
+            .ReturnsAsync(new List<ServiceOrderPart>
+            {
+                MakeServiceOrderPart(Guid.NewGuid(), orderId),
+                MakeServiceOrderPart(Guid.NewGuid(), orderId)
+            });
+        // EnrichPartAsync calls sender for spare part info and orderRepo for owner
+        _sender.Setup(s => s.Send(It.IsAny<GetSparePartByIdQuery>(), default)).ReturnsAsync((SparePartDto?)null);
+        _orderRepo.Setup(r => r.FindAsync(It.IsAny<Guid>())).ReturnsAsync((ServiceOrder?)null);
 
         var result = (await _sut.AllForApiAsync(orderId, Guid.NewGuid(), isAdmin: false, isMechanic: true)).ToList();
 
         result.Should().HaveCount(2);
-        _ownerRepo.Verify(r => r.FindByUserAsync(It.IsAny<Guid>()), Times.Never);
     }
 
     [Fact]
-    public async Task AllForApiAsync_WhenClientAndNoOwner_ReturnsEmpty()
+    public async Task AllForApiAsync_WhenClientAndNoOwnedParts_ReturnsEmpty()
     {
         var orderId = Guid.NewGuid();
         var userId = Guid.NewGuid();
         _partRepo.Setup(r => r.AllWithDetailsAsync(orderId)).ReturnsAsync(new List<ServiceOrderPart>());
-        _ownerRepo.Setup(r => r.FindByUserAsync(userId)).ReturnsAsync((Owner?)null);
 
         var result = await _sut.AllForApiAsync(orderId, userId, isAdmin: false, isMechanic: false);
 
@@ -191,10 +195,7 @@ public class ServiceOrderPartServiceTests
 
     // ── Helpers ───────────────────────────────────────────────────────────────
     private static ServiceOrder MakeOrder(Guid id) =>
-        new() { Id = id, VehicleId = Guid.NewGuid(), WorkshopId = Guid.NewGuid(), Status = App.Domain.Enums.ServiceOrderStatus.Pending };
-
-    private static SparePart MakeSparePart(Guid id, decimal price) =>
-        new() { Id = id, Name = new LangStr("Test Part", "en"), UnitPrice = price, StockQuantity = 10 };
+        new() { Id = id, VehicleId = Guid.NewGuid(), WorkshopId = Guid.NewGuid(), AppUserId = Guid.NewGuid(), Status = ServiceOrderStatus.Pending };
 
     private static ServiceOrderPart MakeServiceOrderPart(Guid id, Guid? orderId = null) =>
         new() { Id = id, ServiceOrderId = orderId ?? Guid.NewGuid(), SparePartId = Guid.NewGuid(), Quantity = 1, UnitPrice = 20m };

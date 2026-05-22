@@ -1,8 +1,8 @@
-using App.BLL;
-using App.BLL.DTO;
+using Orders.Domain.Enums;
 using Base.Helpers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Orders.Application.Services;
 using WebApp.ViewModels.Client;
 
 namespace WebApp.Controllers;
@@ -10,11 +10,11 @@ namespace WebApp.Controllers;
 [Authorize]
 public class ServiceOrdersController : Controller
 {
-    private readonly IAppBll _bll;
+    private readonly IServiceOrderService _serviceOrders;
 
-    public ServiceOrdersController(IAppBll bll)
+    public ServiceOrdersController(IServiceOrderService serviceOrders)
     {
-        _bll = bll;
+        _serviceOrders = serviceOrders;
     }
 
     private bool IsAdmin() => User.IsInRole("admin");
@@ -26,15 +26,15 @@ public class ServiceOrdersController : Controller
         var userId = IdentityHelpers.GetUserId(User);
         if (userId == null) return RedirectToAction("Login", "Account", new { area = "Identity" });
 
-        IEnumerable<BllServiceOrder> bllOrders;
+        IEnumerable<Orders.Application.DTO.BllServiceOrder> bllOrders;
 
         if (IsAdmin() || IsMechanic())
         {
-            bllOrders = await _bll.ServiceOrders.AllWithDetailsAsync();
+            bllOrders = await _serviceOrders.AllWithDetailsAsync();
         }
         else
         {
-            bllOrders = await _bll.ServiceOrders.AllByUserAsync(userId.Value);
+            bllOrders = await _serviceOrders.AllByUserAsync(userId.Value);
         }
 
         var orders = bllOrders
@@ -48,7 +48,7 @@ public class ServiceOrdersController : Controller
         return View(vm);
     }
 
-    private static ServiceOrderClientViewModel ToClientVm(BllServiceOrder so) => new()
+    private static ServiceOrderClientViewModel ToClientVm(Orders.Application.DTO.BllServiceOrder so) => new()
     {
         Id = so.Id,
         Description = so.Description,

@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:element name="root" msdata:IsDataSet="true">
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="Vehicles" xml:space="preserve">
+    <value>Vehicles</value>
+  </data>
+  <data name="Orders" xml:space="preserve">
+    <value>Orders</value>
+  </data>
+  <data name="Payments" xml:space="preserve">
+    <value>Payments</value>
+  </data>
+  <data name="AddVehicle" xml:space="preserve">
+    <value>Add Vehicle</value>
+  </data>
+  <data name="CreateOrder" xml:space="preserve">
+    <value>Create Service Order</value>
+  </data>
+  <data name="Status" xml:space="preserve">
+    <value>Status</value>
+  </data>
+  <data name="Workshop" xml:space="preserve">
+    <value>Workshop</value>
+  </data>
+  <data name="Mechanic" xml:space="preserve">
+    <value>Mechanic</value>
+  </data>
+  <data name="LicensePlate" xml:space="preserve">
+    <value>License Plate</value>
+  </data>
+  <data name="Mileage" xml:space="preserve">
+    <value>Mileage</value>
+  </data>
+  <data name="OrderDate" xml:space="preserve">
+    <value>Order Date</value>
+  </data>
+  <data name="TotalAmount" xml:space="preserve">
+    <value>Total Amount</value>
+  </data>
+  <data name="FinalPrice" xml:space="preserve">
+    <value>Final Price</value>
+  </data>
+  <data name="PaymentStatus" xml:space="preserve">
+    <value>Payment Status</value>
+  </data>
+  <data name="StatusHistory" xml:space="preserve">
+    <value>Status History</value>
+  </data>
+  <data name="RepairPhotos" xml:space="preserve">
+    <value>Repair Photos</value>
+  </data>
+  <data name="NoPhotosYet" xml:space="preserve">
+    <value>No photos yet — Coming soon</value>
+  </data>
+  <data name="NavHome" xml:space="preserve">
+    <value>Home</value>
+  </data>
+  <data name="NavVehicles" xml:space="preserve">
+    <value>Vehicles</value>
+  </data>
+  <data name="NavOrders" xml:space="preserve">
+    <value>Orders</value>
+  </data>
+  <data name="NavPayments" xml:space="preserve">
+    <value>Payments</value>
+  </data>
+  <data name="NavMechanicPanel" xml:space="preserve">
+    <value>Mechanic Panel</value>
+  </data>
+  <data name="NavAdmin" xml:space="preserve">
+    <value>Admin</value>
+  </data>
+  <data name="AdminPanel" xml:space="preserve">
+    <value>Admin Panel</value>
+  </data>
+  <data name="AdminDashboard" xml:space="preserve">
+    <value>Dashboard</value>
+  </data>
+  <data name="AdminServiceOrders" xml:space="preserve">
+    <value>Service Orders</value>
+  </data>
+  <data name="AdminWorkshops" xml:space="preserve">
+    <value>Workshops</value>
+  </data>
+  <data name="AdminMechanics" xml:space="preserve">
+    <value>Mechanics</value>
+  </data>
+  <data name="AdminServices" xml:space="preserve">
+    <value>Services</value>
+  </data>
+  <data name="AdminSpareParts" xml:space="preserve">
+    <value>Spare Parts</value>
+  </data>
+  <data name="BackToSite" xml:space="preserve">
+    <value>Back to Site</value>
+  </data>
+  <data name="Logout" xml:space="preserve">
+    <value>Logout</value>
+  </data>
+</root>

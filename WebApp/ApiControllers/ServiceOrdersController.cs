@@ -1,4 +1,3 @@
-using App.Domain.Enums;
 using App.DTO.v1;
 using App.DTO.v1.ServiceOrder;
 using Asp.Versioning;
@@ -9,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 using Orders.Application.DTO;
 using Orders.Application.Services;
 using Orders.Contracts;
+using Orders.Domain.Enums;
 using Users.Application.Services;
 using Workshops.Application.Services;
 using WebApp.Mappers;
@@ -180,7 +180,7 @@ public class ServiceOrdersController : ControllerBase
             Description = dto.Description,
             VehicleId = dto.VehicleId,
             WorkshopId = dto.WorkshopId,
-            Status = Orders.Domain.Enums.ServiceOrderStatus.Pending,
+            Status = ServiceOrderStatus.Pending,
             OrderDate = orderDate,
             ServiceIds = dto.ServiceIds ?? new List<Guid>()
         });
@@ -189,7 +189,7 @@ public class ServiceOrdersController : ControllerBase
         _statusHistories.Add(new BllStatusHistory
         {
             ServiceOrderId = orderId,
-            Status = Orders.Domain.Enums.ServiceOrderStatus.Pending,
+            Status = ServiceOrderStatus.Pending,
             Notes = "Order created",
             ChangedAt = orderDate
         });
@@ -228,10 +228,7 @@ public class ServiceOrdersController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> UpdateOrderStatus(Guid id, [FromBody] UpdateOrderStatusDto dto)
     {
-        // Cast App.Domain.Enums.ServiceOrderStatus → Orders.Domain.Enums.ServiceOrderStatus
-        // (both enums share identical numeric values 0–5).
-        var moduleStatus = (Orders.Domain.Enums.ServiceOrderStatus)(int)dto.Status;
-        if (!await _serviceOrders.SetStatusAsync(id, moduleStatus, dto.Notes)) return NotFound();
+        if (!await _serviceOrders.SetStatusAsync(id, dto.Status, dto.Notes)) return NotFound();
         await _ordersUow.SaveChangesAsync();
         return NoContent();
     }

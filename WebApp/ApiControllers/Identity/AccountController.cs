@@ -8,12 +8,12 @@ namespace WebApp.ApiControllers.Identity;
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Security.Claims;
-using App.Domain.Identity;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Users.Domain.Identity;
 
 [ApiVersion("1.0")]
 [ApiController]

@@ -1,15 +1,16 @@
-using App.BLL.DTO;
-using App.BLL.Services;
-using App.DAL.Contracts;
-using App.Domain;
 using FluentAssertions;
 using Moq;
+using Users.Application.DTO;
+using Users.Application.Services;
+using Users.Contracts;
+using Users.Contracts.Repositories;
+using Users.Domain;
 
 namespace CarServiceTrack.Tests.Unit.Services;
 
 public class OwnerServiceTests
 {
-    private readonly Mock<IAppUnitOfWork> _uow = new();
+    private readonly Mock<IUsersUnitOfWork> _uow = new();
     private readonly Mock<IOwnerRepository> _repo = new();
     private readonly OwnerService _sut;
 
@@ -84,7 +85,7 @@ public class OwnerServiceTests
     }
 
     [Fact]
-    public void Add_StagedAndReturnsMapped()
+    public void Add_WithValidEntity_StagedAndReturnsMapped()
     {
         var dto = new BllOwner { Id = Guid.NewGuid(), FirstName = "John", LastName = "Doe", AppUserId = Guid.NewGuid() };
         _repo.Setup(r => r.Add(It.IsAny<Owner>())).Returns(MakeOwner(dto.AppUserId, dto.Id));

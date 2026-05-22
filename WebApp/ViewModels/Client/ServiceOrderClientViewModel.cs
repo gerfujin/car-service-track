@@ -1,4 +1,4 @@
-using App.Domain.Enums;
+using Orders.Domain.Enums;
 
 namespace WebApp.ViewModels.Client;
 

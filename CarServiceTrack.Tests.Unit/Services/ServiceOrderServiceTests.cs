@@ -1,25 +1,39 @@
-using App.BLL.DTO;
-using App.BLL.Services;
-using App.DAL.Contracts;
-using App.Domain;
-using App.Domain.Enums;
 using FluentAssertions;
+using MediatR;
 using Moq;
+using Orders.Application.DTO;
+using Orders.Application.Services;
+using Orders.Contracts;
+using Orders.Contracts.Repositories;
+using Orders.Domain;
+using Orders.Domain.Enums;
+using Users.Contracts.Queries;
+using Workshops.Contracts.Queries;
 
 namespace CarServiceTrack.Tests.Unit.Services;
 
 public class ServiceOrderServiceTests
 {
-    private readonly Mock<IAppUnitOfWork> _uow = new();
+    private readonly Mock<IOrdersUnitOfWork> _uow = new();
     private readonly Mock<IServiceOrderRepository> _orderRepo = new();
     private readonly Mock<IServiceOrderStatusHistoryRepository> _historyRepo = new();
+    private readonly Mock<IPaymentRepository> _paymentRepo = new();
+    private readonly Mock<ISender> _sender = new();
     private readonly ServiceOrderService _sut;
 
     public ServiceOrderServiceTests()
     {
         _uow.Setup(u => u.ServiceOrders).Returns(_orderRepo.Object);
         _uow.Setup(u => u.StatusHistories).Returns(_historyRepo.Object);
-        _sut = new ServiceOrderService(_uow.Object);
+        _uow.Setup(u => u.Payments).Returns(_paymentRepo.Object);
+        _sut = new ServiceOrderService(_uow.Object, _sender.Object);
+
+        // Default enrichment stubs — return null for all cross-module queries
+        _sender.Setup(s => s.Send(It.IsAny<GetVehicleByIdQuery>(), default)).ReturnsAsync((VehicleDto?)null);
+        _sender.Setup(s => s.Send(It.IsAny<GetWorkshopByIdQuery>(), default)).ReturnsAsync((WorkshopDto?)null);
+        _sender.Setup(s => s.Send(It.IsAny<GetMechanicByIdQuery>(), default)).ReturnsAsync((MechanicDto?)null);
+        _sender.Setup(s => s.Send(It.IsAny<GetOwnerByAppUserIdQuery>(), default)).ReturnsAsync((OwnerDto?)null);
+        _paymentRepo.Setup(r => r.FindByServiceOrderAsync(It.IsAny<Guid>())).ReturnsAsync((Payment?)null);
     }
 
     // ── AllAsync ──────────────────────────────────────────────────────────────
@@ -28,6 +42,8 @@ public class ServiceOrderServiceTests
     {
         var entities = new List<ServiceOrder> { MakeOrder(), MakeOrder() };
         _orderRepo.Setup(r => r.AllAsync()).ReturnsAsync(entities);
+        // EnrichOrderAsync calls FindWithDetailsAsync for each order
+        _orderRepo.Setup(r => r.FindWithDetailsAsync(It.IsAny<Guid>())).ReturnsAsync((ServiceOrder?)null);
 
         var result = await _sut.AllAsync();
 
@@ -41,6 +57,7 @@ public class ServiceOrderServiceTests
         var userId = Guid.NewGuid();
         var entities = new List<ServiceOrder> { MakeOrder() };
         _orderRepo.Setup(r => r.AllByUserAsync(userId)).ReturnsAsync(entities);
+        _orderRepo.Setup(r => r.FindWithDetailsAsync(It.IsAny<Guid>())).ReturnsAsync((ServiceOrder?)null);
 
         var result = await _sut.AllByUserAsync(userId);
 
@@ -55,6 +72,7 @@ public class ServiceOrderServiceTests
         var id = Guid.NewGuid();
         var entity = MakeOrder(id);
         _orderRepo.Setup(r => r.FindAsync(id)).ReturnsAsync(entity);
+        _orderRepo.Setup(r => r.FindWithDetailsAsync(id)).ReturnsAsync((ServiceOrder?)null);
 
         var result = await _sut.FindAsync(id);
 
@@ -128,6 +146,7 @@ public class ServiceOrderServiceTests
         _orderRepo.Setup(r => r.Update(It.IsAny<ServiceOrder>())).Returns(existing);
         _orderRepo.Setup(r => r.UpdateServiceItemsAsync(It.IsAny<Guid>(), It.IsAny<ICollection<Guid>>()))
             .Returns(Task.CompletedTask);
+        _orderRepo.Setup(r => r.FindWithDetailsAsync(id)).ReturnsAsync((ServiceOrder?)null);
 
         var dto = new BllServiceOrder { Id = id, VehicleId = existing.VehicleId, WorkshopId = existing.WorkshopId, Status = ServiceOrderStatus.InProgress, OrderDate = DateTime.UtcNow, ServiceIds = new List<Guid>() };
         var result = await _sut.UpdateAsync(dto);
@@ -204,6 +223,7 @@ public class ServiceOrderServiceTests
         _orderRepo.Setup(r => r.Add(It.IsAny<ServiceOrder>())).Returns(order);
         _orderRepo.Setup(r => r.AddServiceItemsAsync(It.IsAny<Guid>(), It.IsAny<ICollection<Guid>>()))
             .Returns(Task.CompletedTask);
+        _orderRepo.Setup(r => r.FindWithDetailsAsync(It.IsAny<Guid>())).ReturnsAsync((ServiceOrder?)null);
 
         var dto = new BllServiceOrder
         {
@@ -226,6 +246,7 @@ public class ServiceOrderServiceTests
     {
         var order = MakeOrder();
         _orderRepo.Setup(r => r.Add(It.IsAny<ServiceOrder>())).Returns(order);
+        _orderRepo.Setup(r => r.FindWithDetailsAsync(It.IsAny<Guid>())).ReturnsAsync((ServiceOrder?)null);
 
         var dto = new BllServiceOrder { VehicleId = Guid.NewGuid(), WorkshopId = Guid.NewGuid(), Status = ServiceOrderStatus.Pending, OrderDate = DateTime.UtcNow, ServiceIds = new List<Guid>() };
 
@@ -241,6 +262,7 @@ public class ServiceOrderServiceTests
             Id = id ?? Guid.NewGuid(),
             VehicleId = Guid.NewGuid(),
             WorkshopId = Guid.NewGuid(),
+            AppUserId = Guid.NewGuid(),
             Status = status,
             OrderDate = DateTime.UtcNow,
             ServiceOrderItems = new List<ServiceOrderItem>()

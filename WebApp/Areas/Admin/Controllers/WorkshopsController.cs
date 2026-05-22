@@ -1,8 +1,9 @@
-using App.BLL;
-using App.BLL.DTO;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WebApp.Areas.Admin.ViewModels;
+using Workshops.Contracts.Commands;
+using Workshops.Contracts.Queries;
 
 namespace WebApp.Areas.Admin.Controllers;
 
@@ -10,16 +11,16 @@ namespace WebApp.Areas.Admin.Controllers;
 [Authorize(Roles = "admin")]
 public class WorkshopsController : Controller
 {
-    private readonly IAppBll _appBll;
+    private readonly IMediator _mediator;
 
-    public WorkshopsController(IAppBll appBll)
+    public WorkshopsController(IMediator mediator)
     {
-        _appBll = appBll;
+        _mediator = mediator;
     }
 
     public async Task<IActionResult> Index()
     {
-        var workshops = await _appBll.Workshops.AllAsync();
+        var workshops = await _mediator.Send(new GetAllWorkshopsQuery());
         var vm = new WorkshopListViewModel
         {
             Workshops = workshops.Select(w => new WorkshopViewModel
@@ -45,35 +46,24 @@ public class WorkshopsController : Controller
     {
         if (!ModelState.IsValid) return View(vm);
 
-        var workshop = new BllWorkshop
-        {
-            Name = vm.Name,
-            Address = vm.Address,
-            Phone = vm.Phone,
-            Email = vm.Email
-        };
-
-        _appBll.Workshops.Add(workshop);
-        await _appBll.SaveChangesAsync();
+        await _mediator.Send(new CreateWorkshopCommand(vm.Name, vm.Address, vm.Phone, vm.Email));
 
         return RedirectToAction(nameof(Index));
     }
 
     public async Task<IActionResult> Edit(Guid id)
     {
-        var workshop = await _appBll.Workshops.FindAsync(id);
+        var workshop = await _mediator.Send(new GetWorkshopByIdQuery(id));
         if (workshop == null) return NotFound();
 
-        var vm = new WorkshopViewModel
+        return View(new WorkshopViewModel
         {
             Id = workshop.Id,
             Name = workshop.Name,
             Address = workshop.Address,
             Phone = workshop.Phone,
             Email = workshop.Email
-        };
-
-        return View(vm);
+        });
     }
 
     [HttpPost]
@@ -83,19 +73,7 @@ public class WorkshopsController : Controller
         if (id != vm.Id) return BadRequest();
         if (!ModelState.IsValid) return View(vm);
 
-        var existing = await _appBll.Workshops.FindAsync(id);
-        if (existing == null) return NotFound();
-
-        var workshop = new BllWorkshop
-        {
-            Id = vm.Id,
-            Name = vm.Name,
-            Address = vm.Address,
-            Phone = vm.Phone,
-            Email = vm.Email
-        };
-
-        var result = await _appBll.Workshops.UpdateAsync(workshop);
+        var result = await _mediator.Send(new UpdateWorkshopCommand(vm.Id, vm.Name, vm.Address, vm.Phone, vm.Email));
         if (result == null) return NotFound();
 
         return RedirectToAction(nameof(Index));
@@ -103,48 +81,41 @@ public class WorkshopsController : Controller
 
     public async Task<IActionResult> Delete(Guid id)
     {
-        var workshop = await _appBll.Workshops.FindAsync(id);
+        var workshop = await _mediator.Send(new GetWorkshopByIdQuery(id));
         if (workshop == null) return NotFound();
 
-        var vm = new WorkshopViewModel
+        return View(new WorkshopViewModel
         {
             Id = workshop.Id,
             Name = workshop.Name,
             Address = workshop.Address,
             Phone = workshop.Phone,
             Email = workshop.Email
-        };
-
-        return View(vm);
+        });
     }
 
     [HttpPost, ActionName("Delete")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteConfirmed(Guid id)
     {
-        var workshop = await _appBll.Workshops.FindAsync(id);
-        if (workshop == null) return NotFound();
-
-        _appBll.Workshops.Remove(workshop);
-        await _appBll.SaveChangesAsync();
+        var deleted = await _mediator.Send(new DeleteWorkshopCommand(id));
+        if (!deleted) return NotFound();
 
         return RedirectToAction(nameof(Index));
     }
 
     public async Task<IActionResult> Details(Guid id)
     {
-        var workshop = await _appBll.Workshops.FindAsync(id);
+        var workshop = await _mediator.Send(new GetWorkshopByIdQuery(id));
         if (workshop == null) return NotFound();
 
-        var vm = new WorkshopViewModel
+        return View(new WorkshopViewModel
         {
             Id = workshop.Id,
             Name = workshop.Name,
             Address = workshop.Address,
             Phone = workshop.Phone,
             Email = workshop.Email
-        };
-
-        return View(vm);
+        });
     }
 }

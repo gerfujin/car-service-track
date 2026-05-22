@@ -1,14 +1,15 @@
-using App.BLL.Services;
-using App.DAL.Contracts;
-using App.Domain.Identity;
 using FluentAssertions;
 using Moq;
+using Users.Application.Services;
+using Users.Contracts;
+using Users.Contracts.Repositories;
+using Users.Domain.Identity;
 
 namespace CarServiceTrack.Tests.Unit.Services;
 
 public class RefreshTokenServiceTests
 {
-    private readonly Mock<IAppUnitOfWork> _uow = new();
+    private readonly Mock<IUsersUnitOfWork> _uow = new();
     private readonly Mock<IRefreshTokenRepository> _repo = new();
     private readonly RefreshTokenService _sut;
 
@@ -31,15 +32,15 @@ public class RefreshTokenServiceTests
         _repo.Verify(r => r.RemoveExpiredForUserAsync(userId, It.IsAny<DateTime>()), Times.Once);
     }
 
-    // ── AddForUser ────────────────────────────────────────────────────────────
+    // ── AddForUserAsync ───────────────────────────────────────────────────────
     [Fact]
-    public void AddForUser_StagedTokenAndReturnsRefreshTokenString()
+    public async Task AddForUserAsync_StagedTokenAndReturnsRefreshTokenString()
     {
         var userId = Guid.NewGuid();
         var token = new AppRefreshToken { AppUserId = userId };
         _repo.Setup(r => r.Add(It.IsAny<AppRefreshToken>())).Returns(token);
 
-        var result = _sut.AddForUser(userId);
+        var result = await _sut.AddForUserAsync(userId);
 
         result.Should().NotBeNullOrWhiteSpace();
         _repo.Verify(r => r.Add(It.Is<AppRefreshToken>(t => t.AppUserId == userId)), Times.Once);

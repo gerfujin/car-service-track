@@ -1,7 +1,9 @@
-using App.BLL;
+using Orders.Domain.Enums;
 using Base.Helpers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Orders.Application.Services;
+using Orders.Contracts;
 using WebApp.Areas.Mechanic.ViewModels;
 
 namespace WebApp.Areas.Mechanic.Controllers;
@@ -10,11 +12,13 @@ namespace WebApp.Areas.Mechanic.Controllers;
 [Authorize(Roles = "mechanic")]
 public class OrdersController : Controller
 {
-    private readonly IAppBll _bll;
+    private readonly IServiceOrderService _serviceOrders;
+    private readonly IOrdersUnitOfWork _ordersUow;
 
-    public OrdersController(IAppBll bll)
+    public OrdersController(IServiceOrderService serviceOrders, IOrdersUnitOfWork ordersUow)
     {
-        _bll = bll;
+        _serviceOrders = serviceOrders;
+        _ordersUow = ordersUow;
     }
 
     // GET: /Mechanic/Orders
@@ -23,7 +27,7 @@ public class OrdersController : Controller
         var userId = IdentityHelpers.GetUserId(User);
         if (userId == null) return Challenge();
 
-        var bllOrders = await _bll.ServiceOrders.AllByMechanicAsync(userId.Value);
+        var bllOrders = await _serviceOrders.AllByMechanicAsync(userId.Value);
 
         var orders = bllOrders
             .OrderByDescending(o => o.OrderDate)
@@ -39,7 +43,7 @@ public class OrdersController : Controller
         var userId = IdentityHelpers.GetUserId(User);
         if (userId == null) return Challenge();
 
-        var order = await _bll.ServiceOrders.FindByMechanicAsync(id, userId.Value);
+        var order = await _serviceOrders.FindByMechanicAsync(id, userId.Value);
         if (order == null) return NotFound();
 
         var vm = new MechanicUpdateStatusViewModel
@@ -65,16 +69,17 @@ public class OrdersController : Controller
         var userId = IdentityHelpers.GetUserId(User);
         if (userId == null) return Challenge();
 
-        var result = await _bll.ServiceOrders.UpdateStatusByMechanicAsync(id, userId.Value, vm.NewStatus, vm.Notes);
+        var moduleStatus = (Orders.Domain.Enums.ServiceOrderStatus)(int)vm.NewStatus;
+        var result = await _serviceOrders.UpdateStatusByMechanicAsync(id, userId.Value, moduleStatus, vm.Notes);
         if (!result) return NotFound();
 
-        await _bll.SaveChangesAsync();
+        await _ordersUow.SaveChangesAsync();
 
         TempData["Success"] = $"Order status updated to {vm.NewStatus}.";
         return RedirectToAction(nameof(Index));
     }
 
-    private static MechanicOrderViewModel ToMechanicVm(App.BLL.DTO.BllServiceOrder so) => new()
+    private static MechanicOrderViewModel ToMechanicVm(Orders.Application.DTO.BllServiceOrder so) => new()
     {
         Id = so.Id,
         Description = so.Description,

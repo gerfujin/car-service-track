@@ -1,23 +1,24 @@
-using App.BLL.DTO;
-using App.BLL.Services;
-using App.DAL.Contracts;
-using App.Domain;
 using FluentAssertions;
 using Moq;
+using Users.Application.DTO;
+using Users.Application.Services;
+using Users.Contracts;
+using Users.Contracts.Repositories;
+using Users.Domain;
 
 namespace CarServiceTrack.Tests.Unit.Services;
 
 public class VehicleServiceTests
 {
-    private readonly Mock<IAppUnitOfWork> _uow = new();
+    private readonly Mock<IUsersUnitOfWork> _uow = new();
     private readonly Mock<IVehicleRepository> _vehicleRepo = new();
-    private readonly Mock<IServiceOrderRepository> _serviceOrderRepo = new();
+    private readonly Mock<IOwnerRepository> _ownerRepo = new();
     private readonly VehicleService _sut;
 
     public VehicleServiceTests()
     {
         _uow.Setup(u => u.Vehicles).Returns(_vehicleRepo.Object);
-        _uow.Setup(u => u.ServiceOrders).Returns(_serviceOrderRepo.Object);
+        _uow.Setup(u => u.Owners).Returns(_ownerRepo.Object);
         _sut = new VehicleService(_uow.Object);
     }
 
@@ -140,7 +141,7 @@ public class VehicleServiceTests
         var id = Guid.NewGuid();
         var ownerId = Guid.NewGuid();
         var existing = MakeVehicle(ownerId, "Old Make", "Old Model", id);
-        var updated = MakeVehicle(ownerId, "Old Make", "Old Model", id); // same entity, will be mutated
+        var updated = MakeVehicle(ownerId, "Old Make", "Old Model", id);
         _vehicleRepo.Setup(r => r.FindAsync(id)).ReturnsAsync(existing);
         _vehicleRepo.Setup(r => r.Update(It.IsAny<Vehicle>())).Returns(updated);
 
@@ -160,29 +161,6 @@ public class VehicleServiceTests
 
         result.Should().BeNull();
         _vehicleRepo.Verify(r => r.Update(It.IsAny<Vehicle>()), Times.Never);
-    }
-
-    // ── CanDeleteAsync ────────────────────────────────────────────────────────
-    [Fact]
-    public async Task CanDeleteAsync_WhenNoServiceOrders_ReturnsTrue()
-    {
-        var vehicleId = Guid.NewGuid();
-        _serviceOrderRepo.Setup(r => r.AnyByVehicleAsync(vehicleId)).ReturnsAsync(false);
-
-        var result = await _sut.CanDeleteAsync(vehicleId);
-
-        result.Should().BeTrue();
-    }
-
-    [Fact]
-    public async Task CanDeleteAsync_WhenServiceOrdersExist_ReturnsFalse()
-    {
-        var vehicleId = Guid.NewGuid();
-        _serviceOrderRepo.Setup(r => r.AnyByVehicleAsync(vehicleId)).ReturnsAsync(true);
-
-        var result = await _sut.CanDeleteAsync(vehicleId);
-
-        result.Should().BeFalse();
     }
 
     // ── ExistsAsync ───────────────────────────────────────────────────────────

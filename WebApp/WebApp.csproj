@@ -5,6 +5,7 @@
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <UserSecretsId>aspnet-WebApp-7bc0e7de-2ef9-4f75-99e8-4d9d09badc92</UserSecretsId>
+        <RootNamespace>App</RootNamespace>
     </PropertyGroup>
 
     <ItemGroup>
@@ -27,18 +28,15 @@
       <ProjectReference Include="..\Modules\Users\Users.Infrastructure\Users.Infrastructure.csproj" />
       <ProjectReference Include="..\Modules\Workshops\Workshops.Infrastructure\Workshops.Infrastructure.csproj" />
       <ProjectReference Include="..\Modules\Orders\Orders.Infrastructure\Orders.Infrastructure.csproj" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <ProjectReference Include="..\App.DAL.EF\App.DAL.EF.csproj" />
-      <ProjectReference Include="..\App.DTO\App.DTO.csproj" />
-      <ProjectReference Include="..\App.Resources\App.Resources.csproj" />
       <ProjectReference Include="..\Base.Helpers\Base.Helpers.csproj" />
-      <ProjectReference Include="..\App.DAL.Contracts\App.DAL.Contracts.csproj" />
-      <ProjectReference Include="..\App.BLL\App.BLL.csproj" />
     </ItemGroup>
 
     <ItemGroup>
+      <Compile Include="..\App.DTO\v1\**\*.cs" LinkBase="App.DTO\v1" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Compile Remove="Controllers\ListItemsController.cs" />
       <_ContentIncludedByDefault Remove="Views\Companies\Create.cshtml" />
       <_ContentIncludedByDefault Remove="Views\Companies\Delete.cshtml" />
       <_ContentIncludedByDefault Remove="Views\Companies\Details.cshtml" />

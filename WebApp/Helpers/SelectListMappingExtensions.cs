@@ -1,11 +1,10 @@
-using App.BLL.DTO;
 using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace WebApp.Helpers;
 
 public static class SelectListMappingExtensions
 {
-    public static List<SelectListItem> ToSelectListItems(this IEnumerable<BllSelectListItem> items)
+    public static List<SelectListItem> ToSelectListItems(this IEnumerable<Orders.Application.DTO.BllSelectListItem> items)
     {
         return items.Select(x => new SelectListItem
         {

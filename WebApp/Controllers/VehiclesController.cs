@@ -1,8 +1,9 @@
-using App.BLL;
-using App.BLL.DTO;
 using Base.Helpers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Users.Application.DTO;
+using Users.Application.Services;
+using Users.Contracts;
 using WebApp.ViewModels.Client;
 
 namespace WebApp.Controllers;
@@ -10,11 +11,13 @@ namespace WebApp.Controllers;
 [Authorize]
 public class VehiclesController : Controller
 {
-    private readonly IAppBll _bll;
+    private readonly IVehicleService _vehicleService;
+    private readonly IUsersUnitOfWork _usersUow;
 
-    public VehiclesController(IAppBll bll)
+    public VehiclesController(IVehicleService vehicleService, IUsersUnitOfWork usersUow)
     {
-        _bll = bll;
+        _vehicleService = vehicleService;
+        _usersUow = usersUow;
     }
 
     private Guid GetCurrentUserId()
@@ -34,12 +37,12 @@ public class VehiclesController : Controller
 
         if (IsAdmin() || IsMechanic())
         {
-            vehicles = await _bll.Vehicles.AllAsync();
+            vehicles = await _vehicleService.AllAsync();
         }
         else
         {
             var userId = GetCurrentUserId();
-            vehicles = await _bll.Vehicles.AllByUserAsync(userId);
+            vehicles = await _vehicleService.AllByUserAsync(userId);
         }
 
         var vm = new VehicleListClientViewModel
@@ -67,7 +70,7 @@ public class VehiclesController : Controller
         if (!ModelState.IsValid) return View(vm);
 
         var userId = GetCurrentUserId();
-        var ownerId = await _bll.Vehicles.GetOrCreateOwnerIdAsync(userId);
+        var ownerId = await _vehicleService.GetOrCreateOwnerIdAsync(userId);
 
         var bllVehicle = new BllVehicle
         {
@@ -81,8 +84,8 @@ public class VehiclesController : Controller
             OwnerId = ownerId
         };
 
-        _bll.Vehicles.Add(bllVehicle);
-        await _bll.SaveChangesAsync();
+        _vehicleService.Add(bllVehicle);
+        await _usersUow.SaveChangesAsync();
 
         return RedirectToAction(nameof(Index));
     }
@@ -95,12 +98,12 @@ public class VehiclesController : Controller
 
         if (IsAdmin())
         {
-            vehicle = await _bll.Vehicles.FindAsync(id);
+            vehicle = await _vehicleService.FindAsync(id);
         }
         else
         {
             var userId = GetCurrentUserId();
-            vehicle = await _bll.Vehicles.FindByUserAsync(id, userId);
+            vehicle = await _vehicleService.FindByUserAsync(id, userId);
         }
 
         if (vehicle == null) return NotFound();
@@ -133,12 +136,12 @@ public class VehiclesController : Controller
 
         if (IsAdmin())
         {
-            existing = await _bll.Vehicles.FindAsync(id);
+            existing = await _vehicleService.FindAsync(id);
         }
         else
         {
             var userId = GetCurrentUserId();
-            existing = await _bll.Vehicles.FindByUserAsync(id, userId);
+            existing = await _vehicleService.FindByUserAsync(id, userId);
         }
 
         if (existing == null) return NotFound();
@@ -151,8 +154,8 @@ public class VehiclesController : Controller
         existing.Mileage = vm.Mileage;
         existing.Color = vm.Color;
 
-        await _bll.Vehicles.UpdateAsync(existing);
-        await _bll.SaveChangesAsync();
+        await _vehicleService.UpdateAsync(existing);
+        await _usersUow.SaveChangesAsync();
 
         return RedirectToAction(nameof(Index));
     }
@@ -164,12 +167,12 @@ public class VehiclesController : Controller
 
         if (IsAdmin() || IsMechanic())
         {
-            vehicle = await _bll.Vehicles.FindAsync(id);
+            vehicle = await _vehicleService.FindAsync(id);
         }
         else
         {
             var userId = GetCurrentUserId();
-            vehicle = await _bll.Vehicles.FindByUserAsync(id, userId);
+            vehicle = await _vehicleService.FindByUserAsync(id, userId);
         }
 
         if (vehicle == null) return NotFound();
@@ -199,12 +202,12 @@ public class VehiclesController : Controller
 
         if (IsAdmin())
         {
-            vehicle = await _bll.Vehicles.FindAsync(id);
+            vehicle = await _vehicleService.FindAsync(id);
         }
         else
         {
             var userId = GetCurrentUserId();
-            vehicle = await _bll.Vehicles.FindByUserAsync(id, userId);
+            vehicle = await _vehicleService.FindByUserAsync(id, userId);
         }
 
         if (vehicle == null) return NotFound();
@@ -234,18 +237,18 @@ public class VehiclesController : Controller
 
         if (IsAdmin())
         {
-            vehicle = await _bll.Vehicles.FindAsync(id);
+            vehicle = await _vehicleService.FindAsync(id);
         }
         else
         {
             var userId = GetCurrentUserId();
-            vehicle = await _bll.Vehicles.FindByUserAsync(id, userId);
+            vehicle = await _vehicleService.FindByUserAsync(id, userId);
         }
 
         if (vehicle == null) return NotFound();
 
-        _bll.Vehicles.Remove(vehicle);
-        await _bll.SaveChangesAsync();
+        _vehicleService.Remove(vehicle);
+        await _usersUow.SaveChangesAsync();
 
         return RedirectToAction(nameof(Index));
     }

@@ -120,7 +120,7 @@ public class ServiceOrdersControllerTests : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.Created);
         var order = await response.Content.ReadFromJsonAsync<ServiceOrderDto>(TestJson.Options);
         order!.VehicleId.Should().Be(_seed.UserAVehicleId);
-        order.Status.Should().Be(App.Domain.Enums.ServiceOrderStatus.Pending);
+        order.Status.Should().Be(Orders.Domain.Enums.ServiceOrderStatus.Pending);
     }
 
     [Fact]
@@ -155,7 +155,7 @@ public class ServiceOrdersControllerTests : IAsyncLifetime
     public async Task UpdateOrderStatus_AsAdmin_Returns204()
     {
         SetBearerToken(TestJwtHelper.AdminBearer(_seed.AdminId, _seed.AdminEmail));
-        var dto = new UpdateOrderStatusDto { Status = App.Domain.Enums.ServiceOrderStatus.Accepted, Notes = "Accepted by admin" };
+        var dto = new UpdateOrderStatusDto { Status = Orders.Domain.Enums.ServiceOrderStatus.Accepted, Notes = "Accepted by admin" };
 
         var response = await _client.PatchAsJsonAsync($"/api/v1/serviceorders/{_seed.UserAOrderId}/status", dto);
 
@@ -166,7 +166,7 @@ public class ServiceOrdersControllerTests : IAsyncLifetime
     public async Task UpdateOrderStatus_AsClient_Returns403()
     {
         SetBearerToken(TestJwtHelper.ClientBearer(_seed.UserAId, _seed.UserAEmail));
-        var dto = new UpdateOrderStatusDto { Status = App.Domain.Enums.ServiceOrderStatus.Completed };
+        var dto = new UpdateOrderStatusDto { Status = Orders.Domain.Enums.ServiceOrderStatus.Completed };
 
         var response = await _client.PatchAsJsonAsync($"/api/v1/serviceorders/{_seed.UserAOrderId}/status", dto);
 

@@ -1,16 +1,17 @@
-using App.BLL.DTO;
-using App.BLL.Services;
-using App.DAL.Contracts;
-using App.Domain;
 using Base.Domain;
 using FluentAssertions;
 using Moq;
+using Workshops.Application.DTO;
+using Workshops.Application.Services;
+using Workshops.Contracts;
+using Workshops.Contracts.Repositories;
+using Workshops.Domain;
 
 namespace CarServiceTrack.Tests.Unit.Services;
 
 public class ServiceServiceTests
 {
-    private readonly Mock<IAppUnitOfWork> _uow = new();
+    private readonly Mock<IWorkshopsUnitOfWork> _uow = new();
     private readonly Mock<IServiceRepository> _repo = new();
     private readonly ServiceService _sut;
 
@@ -21,9 +22,10 @@ public class ServiceServiceTests
     }
 
     [Fact]
-    public async Task AllAsync_ReturnsAllMapped()
+    public async Task AllAsync_WhenServicesExist_ReturnsAllMapped()
     {
-        _repo.Setup(r => r.AllAsync()).ReturnsAsync(new List<Service> { MakeService("Oil Change", 49.99m), MakeService("Brake Check", 39.99m) });
+        _repo.Setup(r => r.AllAsync())
+            .ReturnsAsync(new List<Service> { MakeService("Oil Change", 49.99m), MakeService("Brake Check", 39.99m) });
 
         var result = (await _sut.AllAsync()).ToList();
 
@@ -54,7 +56,7 @@ public class ServiceServiceTests
     }
 
     [Fact]
-    public void Add_StagedAndReturnsMapped()
+    public void Add_WithValidEntity_StagedAndReturnsMapped()
     {
         var dto = new BllService { Id = Guid.NewGuid(), Name = "New Service", BasePrice = 25m };
         _repo.Setup(r => r.Add(It.IsAny<Service>())).Returns(MakeService("New Service", 25m, dto.Id));
@@ -100,11 +102,14 @@ public class ServiceServiceTests
     }
 
     [Fact]
-    public async Task ExistsAsync_WhenExists_ReturnsTrue()
+    public async Task ExistsAsync_WhenServiceExists_ReturnsTrue()
     {
         var id = Guid.NewGuid();
         _repo.Setup(r => r.ExistsAsync(id)).ReturnsAsync(true);
-        (await _sut.ExistsAsync(id)).Should().BeTrue();
+
+        var result = await _sut.ExistsAsync(id);
+
+        result.Should().BeTrue();
     }
 
     private static Service MakeService(string name, decimal price, Guid? id = null) =>

@@ -36,7 +36,7 @@
                     <div class="mb-3">
                         <label asp-for="NewStatus" class="form-label fw-bold">New Status</label>
                         <select asp-for="NewStatus" class="form-select"
-                                asp-items="Html.GetEnumSelectList<App.Domain.Enums.ServiceOrderStatus>()">
+                                asp-items="Html.GetEnumSelectList<Orders.Domain.Enums.ServiceOrderStatus>()">
                         </select>
                         <span asp-validation-for="NewStatus" class="text-danger"></span>
                     </div>
@@ -60,3 +60,4 @@
 @section Scripts {
     @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
 }
+

@@ -4,9 +4,9 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        VITE_API_BASE_URL: https://alejeg-pp.proxy.itcollege.ee
+        VITE_API_BASE_URL: https://alejeg-a5back.proxy.itcollege.ee
     ports:
-      - "81:80"
+      - "98:80"
     depends_on:
       - backend
     restart: unless-stopped
@@ -16,7 +16,7 @@ services:
       context: .
       dockerfile: WebApp/Dockerfile
     ports:
-      - "80:8080"
+      - "99:8080"
     depends_on:
       db:
         condition: service_healthy
@@ -27,14 +27,12 @@ services:
 
   db:
     image: postgres:16
-    ports:
-      - "5432:5432"
     environment:
       POSTGRES_DB: carservicetrack
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     volumes:
-      - personalproject_pgdata:/var/lib/postgresql/data
+      - a5_pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d carservicetrack"]
@@ -44,4 +42,4 @@ services:
       start_period: 10s
 
 volumes:
-  personalproject_pgdata:
+  a5_pgdata:

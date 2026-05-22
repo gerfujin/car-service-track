@@ -1,5 +1,5 @@
 using System.ComponentModel.DataAnnotations;
-using App.Domain.Enums;
+using Orders.Domain.Enums;
 using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace WebApp.Areas.Admin.ViewModels;

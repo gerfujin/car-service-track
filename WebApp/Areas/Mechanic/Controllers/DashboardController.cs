@@ -1,7 +1,7 @@
-using App.BLL;
 using Base.Helpers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Orders.Application.Services;
 using WebApp.Areas.Mechanic.ViewModels;
 
 namespace WebApp.Areas.Mechanic.Controllers;
@@ -10,11 +10,11 @@ namespace WebApp.Areas.Mechanic.Controllers;
 [Authorize(Roles = "mechanic")]
 public class DashboardController : Controller
 {
-    private readonly IAppBll _bll;
+    private readonly IServiceOrderService _serviceOrders;
 
-    public DashboardController(IAppBll bll)
+    public DashboardController(IServiceOrderService serviceOrders)
     {
-        _bll = bll;
+        _serviceOrders = serviceOrders;
     }
 
     public async Task<IActionResult> Index()
@@ -22,7 +22,7 @@ public class DashboardController : Controller
         var userId = IdentityHelpers.GetUserId(User);
         if (userId == null) return Challenge();
 
-        var stats = await _bll.ServiceOrders.GetMechanicDashboardStatsAsync(userId.Value);
+        var stats = await _serviceOrders.GetMechanicDashboardStatsAsync(userId.Value);
 
         var vm = new MechanicDashboardViewModel
         {

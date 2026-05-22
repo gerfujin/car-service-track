@@ -40,10 +40,10 @@ else
                                 @{
                                     var badgeClass = order.Status switch
                                     {
-                                        App.Domain.Enums.ServiceOrderStatus.Pending => "bg-secondary",
-                                        App.Domain.Enums.ServiceOrderStatus.InProgress => "bg-primary",
-                                        App.Domain.Enums.ServiceOrderStatus.Completed => "bg-success",
-                                        App.Domain.Enums.ServiceOrderStatus.Cancelled => "bg-danger",
+                                        Orders.Domain.Enums.ServiceOrderStatus.Pending => "bg-secondary",
+                                        Orders.Domain.Enums.ServiceOrderStatus.InProgress => "bg-primary",
+                                        Orders.Domain.Enums.ServiceOrderStatus.Completed => "bg-success",
+                                        Orders.Domain.Enums.ServiceOrderStatus.Cancelled => "bg-danger",
                                         _ => "bg-secondary"
                                     };
                                 }
@@ -62,8 +62,8 @@ else
                                 }
                             </td>
                             <td class="text-end">
-                                @if (order.Status != App.Domain.Enums.ServiceOrderStatus.Completed &&
-                                     order.Status != App.Domain.Enums.ServiceOrderStatus.Cancelled)
+                                @if (order.Status != Orders.Domain.Enums.ServiceOrderStatus.Completed &&
+                                     order.Status != Orders.Domain.Enums.ServiceOrderStatus.Cancelled)
                                 {
                                     <a asp-area="Mechanic" asp-controller="Orders" asp-action="UpdateStatus"
                                        asp-route-id="@order.Id" class="btn btn-sm btn-outline-primary">
@@ -78,3 +78,4 @@ else
         </div>
     </div>
 }
+

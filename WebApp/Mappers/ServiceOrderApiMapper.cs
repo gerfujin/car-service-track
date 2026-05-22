@@ -1,4 +1,3 @@
-using App.Domain.Enums;
 using App.DTO.v1.Service;
 using App.DTO.v1.ServiceOrder;
 using Orders.Application.DTO;
@@ -19,7 +18,7 @@ public static class ServiceOrderApiMapper
     {
         Id = o.Id,
         Description = o.Description,
-        Status = (ServiceOrderStatus)(int)o.Status,
+        Status = o.Status,
         OrderDate = o.OrderDate,
         CompletedDate = o.CompletedDate,
         VehicleId = o.VehicleId,

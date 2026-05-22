@@ -1,10 +1,12 @@
-using App.BLL;
-using App.Domain.Enums;
+using Orders.Domain.Enums;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using Orders.Contracts.Commands;
+using Orders.Contracts.Queries;
 using WebApp.Areas.Admin.ViewModels;
-using WebApp.Helpers;
+using Workshops.Contracts.Queries;
 
 namespace WebApp.Areas.Admin.Controllers;
 
@@ -12,16 +14,16 @@ namespace WebApp.Areas.Admin.Controllers;
 [Authorize(Roles = "admin,mechanic")]
 public class ServiceOrdersController : Controller
 {
-    private readonly IAppBll _appBll;
+    private readonly IMediator _mediator;
 
-    public ServiceOrdersController(IAppBll appBll)
+    public ServiceOrdersController(IMediator mediator)
     {
-        _appBll = appBll;
+        _mediator = mediator;
     }
 
     public async Task<IActionResult> Index()
     {
-        var orders = await _appBll.ServiceOrders.AllWithDetailsAsync();
+        var orders = await _mediator.Send(new GetAllServiceOrdersQuery());
         var vm = new ServiceOrderAdminListViewModel
         {
             Orders = orders.Select(so => new ServiceOrderAdminViewModel
@@ -46,11 +48,8 @@ public class ServiceOrdersController : Controller
 
     public async Task<IActionResult> UpdateStatus(Guid id)
     {
-        var order = await _appBll.ServiceOrders.FindWithDetailsAsync(id);
-
+        var order = await _mediator.Send(new GetServiceOrderByIdQuery(id));
         if (order == null) return NotFound();
-
-        var mechanics = (await _appBll.Mechanics.GetSelectListAsync()).ToSelectListItems();
 
         var vm = new ServiceOrderStatusUpdateViewModel
         {
@@ -62,7 +61,7 @@ public class ServiceOrdersController : Controller
             StatusOptions = Enum.GetValues<ServiceOrderStatus>()
                 .Select(s => new SelectListItem { Value = ((int)s).ToString(), Text = s.ToString() })
                 .ToList(),
-            MechanicOptions = mechanics
+            MechanicOptions = await BuildMechanicSelectListAsync()
         };
 
         return View(vm);
@@ -79,15 +78,28 @@ public class ServiceOrdersController : Controller
             vm.StatusOptions = Enum.GetValues<ServiceOrderStatus>()
                 .Select(s => new SelectListItem { Value = ((int)s).ToString(), Text = s.ToString() })
                 .ToList();
-            vm.MechanicOptions = (await _appBll.Mechanics.GetSelectListAsync()).ToSelectListItems();
+            vm.MechanicOptions = await BuildMechanicSelectListAsync();
             return View(vm);
         }
 
-        var result = await _appBll.ServiceOrders.UpdateStatusForAdminAsync(id, vm.NewStatus, vm.MechanicId, vm.FinalPrice, vm.Notes);
+        var moduleStatus = (Orders.Domain.Enums.ServiceOrderStatus)(int)vm.NewStatus;
+        var result = await _mediator.Send(new UpdateServiceOrderStatusAdminCommand(
+            id, moduleStatus, vm.MechanicId, vm.FinalPrice, vm.Notes));
+
         if (!result) return NotFound();
 
-        await _appBll.SaveChangesAsync();
-
         return RedirectToAction(nameof(Index));
+    }
+
+    private async Task<List<SelectListItem>> BuildMechanicSelectListAsync()
+    {
+        var mechanics = await _mediator.Send(new GetAllMechanicsQuery());
+        return mechanics
+            .Select(m => new SelectListItem
+            {
+                Value = m.Id.ToString(),
+                Text = $"{m.FirstName} {m.LastName}"
+            })
+            .ToList();
     }
 }

@@ -1,8 +1,9 @@
-using App.BLL;
-using App.BLL.DTO;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WebApp.Areas.Admin.ViewModels;
+using Workshops.Contracts.Commands;
+using Workshops.Contracts.Queries;
 
 namespace WebApp.Areas.Admin.Controllers;
 
@@ -10,16 +11,16 @@ namespace WebApp.Areas.Admin.Controllers;
 [Authorize(Roles = "admin")]
 public class ServicesController : Controller
 {
-    private readonly IAppBll _appBll;
+    private readonly IMediator _mediator;
 
-    public ServicesController(IAppBll appBll)
+    public ServicesController(IMediator mediator)
     {
-        _appBll = appBll;
+        _mediator = mediator;
     }
 
     public async Task<IActionResult> Index()
     {
-        var services = await _appBll.Services.AllAsync();
+        var services = await _mediator.Send(new GetAllServicesQuery());
         var vm = new ServiceAdminListViewModel
         {
             Services = services.Select(s => new ServiceAdminViewModel
@@ -45,16 +46,8 @@ public class ServicesController : Controller
     {
         if (!ModelState.IsValid) return View(vm);
 
-        var service = new BllService
-        {
-            Name = vm.Name,
-            Description = vm.Description,
-            BasePrice = vm.BasePrice,
-            EstimatedTimeMinutes = vm.EstimatedTimeMinutes
-        };
-
-        _appBll.Services.Add(service);
-        await _appBll.SaveChangesAsync();
+        await _mediator.Send(new CreateServiceCommand(
+            vm.Name, vm.Description, vm.BasePrice, vm.EstimatedTimeMinutes));
 
         TempData["Success"] = $"Service '{vm.Name}' created successfully.";
         return RedirectToAction(nameof(Index));
@@ -62,19 +55,17 @@ public class ServicesController : Controller
 
     public async Task<IActionResult> Edit(Guid id)
     {
-        var service = await _appBll.Services.FindAsync(id);
+        var service = await _mediator.Send(new GetServiceByIdQuery(id));
         if (service == null) return NotFound();
 
-        var vm = new ServiceAdminViewModel
+        return View(new ServiceAdminViewModel
         {
             Id = service.Id,
             Name = service.Name,
             Description = service.Description ?? string.Empty,
             BasePrice = service.BasePrice,
             EstimatedTimeMinutes = service.EstimatedTimeMinutes
-        };
-
-        return View(vm);
+        });
     }
 
     [HttpPost]
@@ -84,19 +75,8 @@ public class ServicesController : Controller
         if (id != vm.Id) return BadRequest();
         if (!ModelState.IsValid) return View(vm);
 
-        var existing = await _appBll.Services.FindAsync(id);
-        if (existing == null) return NotFound();
-
-        var service = new BllService
-        {
-            Id = vm.Id,
-            Name = vm.Name,
-            Description = vm.Description,
-            BasePrice = vm.BasePrice,
-            EstimatedTimeMinutes = vm.EstimatedTimeMinutes
-        };
-
-        var result = await _appBll.Services.UpdateAsync(service);
+        var result = await _mediator.Send(new UpdateServiceCommand(
+            vm.Id, vm.Name, vm.Description, vm.BasePrice, vm.EstimatedTimeMinutes));
         if (result == null) return NotFound();
 
         TempData["Success"] = $"Service '{vm.Name}' updated successfully.";
@@ -105,30 +85,25 @@ public class ServicesController : Controller
 
     public async Task<IActionResult> Delete(Guid id)
     {
-        var service = await _appBll.Services.FindAsync(id);
+        var service = await _mediator.Send(new GetServiceByIdQuery(id));
         if (service == null) return NotFound();
 
-        var vm = new ServiceAdminViewModel
+        return View(new ServiceAdminViewModel
         {
             Id = service.Id,
             Name = service.Name,
             Description = service.Description ?? string.Empty,
             BasePrice = service.BasePrice,
             EstimatedTimeMinutes = service.EstimatedTimeMinutes
-        };
-
-        return View(vm);
+        });
     }
 
     [HttpPost, ActionName("Delete")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteConfirmed(Guid id)
     {
-        var service = await _appBll.Services.FindAsync(id);
-        if (service == null) return NotFound();
-
-        _appBll.Services.Remove(service);
-        await _appBll.SaveChangesAsync();
+        var deleted = await _mediator.Send(new DeleteServiceCommand(id));
+        if (!deleted) return NotFound();
 
         TempData["Success"] = "Service deleted successfully.";
         return RedirectToAction(nameof(Index));
@@ -136,18 +111,16 @@ public class ServicesController : Controller
 
     public async Task<IActionResult> Details(Guid id)
     {
-        var service = await _appBll.Services.FindAsync(id);
+        var service = await _mediator.Send(new GetServiceByIdQuery(id));
         if (service == null) return NotFound();
 
-        var vm = new ServiceAdminViewModel
+        return View(new ServiceAdminViewModel
         {
             Id = service.Id,
             Name = service.Name,
             Description = service.Description ?? string.Empty,
             BasePrice = service.BasePrice,
             EstimatedTimeMinutes = service.EstimatedTimeMinutes
-        };
-
-        return View(vm);
+        });
     }
 }

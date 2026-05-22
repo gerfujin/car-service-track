@@ -1,8 +1,9 @@
-using App.BLL;
-using App.BLL.DTO;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WebApp.Areas.Admin.ViewModels;
+using Workshops.Contracts.Commands;
+using Workshops.Contracts.Queries;
 
 namespace WebApp.Areas.Admin.Controllers;
 
@@ -10,26 +11,28 @@ namespace WebApp.Areas.Admin.Controllers;
 [Authorize(Roles = "admin")]
 public class SparePartsController : Controller
 {
-    private readonly IAppBll _appBll;
+    private readonly IMediator _mediator;
 
-    public SparePartsController(IAppBll appBll)
+    public SparePartsController(IMediator mediator)
     {
-        _appBll = appBll;
+        _mediator = mediator;
     }
 
     public async Task<IActionResult> Index()
     {
-        var entities = await _appBll.SpareParts.AllAsync();
-        var parts = entities.Select(sp => new SparePartAdminViewModel
+        var parts = await _mediator.Send(new GetAllSparePartsQuery());
+        var vm = new SparePartAdminListViewModel
         {
-            Id = sp.Id,
-            Name = sp.Name,
-            PartNumber = sp.PartNumber,
-            UnitPrice = sp.UnitPrice,
-            StockQuantity = sp.StockQuantity
-        }).ToList();
-
-        return View(new SparePartAdminListViewModel { SpareParts = parts });
+            SpareParts = parts.Select(sp => new SparePartAdminViewModel
+            {
+                Id = sp.Id,
+                Name = sp.Name,
+                PartNumber = sp.PartNumber,
+                UnitPrice = sp.UnitPrice,
+                StockQuantity = sp.StockQuantity
+            }).ToList()
+        };
+        return View(vm);
     }
 
     public IActionResult Create()
@@ -43,16 +46,8 @@ public class SparePartsController : Controller
     {
         if (!ModelState.IsValid) return View(vm);
 
-        var part = new BllSparePart
-        {
-            Name = vm.Name ?? "",
-            PartNumber = vm.PartNumber,
-            UnitPrice = vm.UnitPrice,
-            StockQuantity = vm.StockQuantity
-        };
-
-        _appBll.SpareParts.Add(part);
-        await _appBll.SaveChangesAsync();
+        await _mediator.Send(new CreateSparePartCommand(
+            vm.Name ?? "", vm.PartNumber, vm.UnitPrice, vm.StockQuantity));
 
         TempData["Success"] = $"Spare part '{vm.Name}' created successfully.";
         return RedirectToAction(nameof(Index));
@@ -60,19 +55,17 @@ public class SparePartsController : Controller
 
     public async Task<IActionResult> Edit(Guid id)
     {
-        var part = await _appBll.SpareParts.FindAsync(id);
+        var part = await _mediator.Send(new GetSparePartByIdQuery(id));
         if (part == null) return NotFound();
 
-        var vm = new SparePartAdminViewModel
+        return View(new SparePartAdminViewModel
         {
             Id = part.Id,
             Name = part.Name,
             PartNumber = part.PartNumber,
             UnitPrice = part.UnitPrice,
             StockQuantity = part.StockQuantity
-        };
-
-        return View(vm);
+        });
     }
 
     [HttpPost]
@@ -82,19 +75,8 @@ public class SparePartsController : Controller
         if (id != vm.Id) return BadRequest();
         if (!ModelState.IsValid) return View(vm);
 
-        var existing = await _appBll.SpareParts.FindAsync(id);
-        if (existing == null) return NotFound();
-
-        var part = new BllSparePart
-        {
-            Id = vm.Id,
-            Name = vm.Name ?? "",
-            PartNumber = vm.PartNumber,
-            UnitPrice = vm.UnitPrice,
-            StockQuantity = vm.StockQuantity
-        };
-
-        var result = await _appBll.SpareParts.UpdateAsync(part);
+        var result = await _mediator.Send(new UpdateSparePartCommand(
+            vm.Id, vm.Name ?? "", vm.PartNumber, vm.UnitPrice, vm.StockQuantity));
         if (result == null) return NotFound();
 
         TempData["Success"] = $"Spare part '{vm.Name}' updated successfully.";
@@ -103,30 +85,25 @@ public class SparePartsController : Controller
 
     public async Task<IActionResult> Delete(Guid id)
     {
-        var part = await _appBll.SpareParts.FindAsync(id);
+        var part = await _mediator.Send(new GetSparePartByIdQuery(id));
         if (part == null) return NotFound();
 
-        var vm = new SparePartAdminViewModel
+        return View(new SparePartAdminViewModel
         {
             Id = part.Id,
             Name = part.Name,
             PartNumber = part.PartNumber,
             UnitPrice = part.UnitPrice,
             StockQuantity = part.StockQuantity
-        };
-
-        return View(vm);
+        });
     }
 
     [HttpPost, ActionName("Delete")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteConfirmed(Guid id)
     {
-        var part = await _appBll.SpareParts.FindAsync(id);
-        if (part == null) return NotFound();
-
-        _appBll.SpareParts.Remove(part);
-        await _appBll.SaveChangesAsync();
+        var deleted = await _mediator.Send(new DeleteSparePartCommand(id));
+        if (!deleted) return NotFound();
 
         TempData["Success"] = "Spare part deleted successfully.";
         return RedirectToAction(nameof(Index));

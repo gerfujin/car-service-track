@@ -1,15 +1,16 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
-WORKDIR /src
-
-COPY . .
-RUN dotnet restore WebApp/WebApp.csproj
-RUN dotnet publish WebApp/WebApp.csproj -c Release -o /app/publish
-
-FROM mcr.microsoft.com/dotnet/aspnet:10.0
+FROM node:20-alpine AS build
 WORKDIR /app
 
-COPY --from=build /app/publish .
-ENV ASPNETCORE_URLS=http://+:8080
-EXPOSE 8080
+COPY client-app/package*.json ./
+RUN npm ci
 
-ENTRYPOINT ["dotnet", "WebApp.dll"]
+COPY client-app/ .
+
+ARG VITE_API_BASE_URL=https://alejeg-a5back.proxy.itcollege.ee
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+
+RUN npm run build
+
+FROM nginx:alpine
+COPY client-app/nginx.conf /etc/nginx/nginx.conf
+COPY --from=build /app/dist /usr/share/nginx/html

@@ -1,9 +1,11 @@
-using App.BLL;
-using App.BLL.DTO;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
+using Orders.Contracts.Commands;
+using Orders.Contracts.Queries;
 using WebApp.Areas.Admin.ViewModels;
-using WebApp.Helpers;
+using Workshops.Contracts.Queries;
 
 namespace WebApp.Areas.Admin.Controllers;
 
@@ -11,19 +13,20 @@ namespace WebApp.Areas.Admin.Controllers;
 [Authorize(Roles = "admin")]
 public class ServiceOrderPartsController : Controller
 {
-    private readonly IAppBll _appBll;
+    private readonly IMediator _mediator;
 
-    public ServiceOrderPartsController(IAppBll appBll)
+    public ServiceOrderPartsController(IMediator mediator)
     {
-        _appBll = appBll;
+        _mediator = mediator;
     }
 
     public async Task<IActionResult> Index(Guid? serviceOrderId)
     {
-        var allParts = await _appBll.ServiceOrderParts.AllAsync();
-        var parts = allParts
-            .Where(x => !serviceOrderId.HasValue || x.ServiceOrderId == serviceOrderId.Value)
-            .Select(x => new ServiceOrderPartAdminViewModel
+        var parts = await _mediator.Send(new GetAllServiceOrderPartsQuery(serviceOrderId));
+        return View(new ServiceOrderPartAdminListViewModel
+        {
+            ServiceOrderId = serviceOrderId,
+            Parts = parts.Select(x => new ServiceOrderPartAdminViewModel
             {
                 Id = x.Id,
                 ServiceOrderId = x.ServiceOrderId,
@@ -31,19 +34,13 @@ public class ServiceOrderPartsController : Controller
                 Quantity = x.Quantity,
                 Price = x.UnitPrice,
                 SparePartName = x.SparePartName
-            })
-            .ToList();
-
-        return View(new ServiceOrderPartAdminListViewModel
-        {
-            ServiceOrderId = serviceOrderId,
-            Parts = parts
+            }).ToList()
         });
     }
 
     public async Task<IActionResult> Details(Guid id)
     {
-        var entity = await _appBll.ServiceOrderParts.FindAsync(id);
+        var entity = await _mediator.Send(new GetServiceOrderPartByIdQuery(id));
         if (entity == null) return NotFound();
 
         return View(new ServiceOrderPartAdminViewModel
@@ -64,7 +61,7 @@ public class ServiceOrderPartsController : Controller
             ServiceOrderId = serviceOrderId ?? Guid.Empty,
             Quantity = 1
         };
-        await PopulateOptions(vm);
+        await PopulateOptionsAsync(vm);
         return View(vm);
     }
 
@@ -74,37 +71,26 @@ public class ServiceOrderPartsController : Controller
     {
         if (!ModelState.IsValid)
         {
-            await PopulateOptions(vm);
+            await PopulateOptionsAsync(vm);
             return View(vm);
         }
 
-        var order = await _appBll.ServiceOrders.FindAsync(vm.ServiceOrderId);
-        var sparePart = await _appBll.SpareParts.FindAsync(vm.SparePartId);
-        if (order == null || sparePart == null)
+        var result = await _mediator.Send(new CreateServiceOrderPartCommand(
+            vm.ServiceOrderId, vm.SparePartId, vm.Quantity, vm.Price));
+
+        if (result == null)
         {
             TempData["Error"] = "Service order or spare part not found.";
-            await PopulateOptions(vm);
+            await PopulateOptionsAsync(vm);
             return View(vm);
         }
-
-        var entity = new BllServiceOrderPart
-        {
-            ServiceOrderId = vm.ServiceOrderId,
-            SparePartId = vm.SparePartId,
-            Quantity = vm.Quantity,
-            UnitPrice = vm.Price <= 0 ? sparePart.UnitPrice : vm.Price
-        };
-
-        _appBll.ServiceOrderParts.Add(entity);
-        await _appBll.ServiceOrderParts.RecalculateOrderTotalAsync(entity.ServiceOrderId);
-        await _appBll.SaveChangesAsync();
 
         return RedirectToAction(nameof(Index), new { serviceOrderId = vm.ServiceOrderId });
     }
 
     public async Task<IActionResult> Edit(Guid id)
     {
-        var entity = await _appBll.ServiceOrderParts.FindAsync(id);
+        var entity = await _mediator.Send(new GetServiceOrderPartByIdQuery(id));
         if (entity == null) return NotFound();
 
         var vm = new ServiceOrderPartAdminViewModel
@@ -115,8 +101,7 @@ public class ServiceOrderPartsController : Controller
             Quantity = entity.Quantity,
             Price = entity.UnitPrice
         };
-
-        await PopulateOptions(vm);
+        await PopulateOptionsAsync(vm);
         return View(vm);
     }
 
@@ -127,35 +112,21 @@ public class ServiceOrderPartsController : Controller
         if (id != vm.Id) return BadRequest();
         if (!ModelState.IsValid)
         {
-            await PopulateOptions(vm);
+            await PopulateOptionsAsync(vm);
             return View(vm);
         }
 
-        var existing = await _appBll.ServiceOrderParts.FindAsync(id);
-        var sparePart = await _appBll.SpareParts.FindAsync(vm.SparePartId);
-        if (existing == null || sparePart == null) return NotFound();
+        var result = await _mediator.Send(new UpdateServiceOrderPartCommand(
+            vm.Id, vm.ServiceOrderId, vm.SparePartId, vm.Quantity, vm.Price));
 
-        var entity = new BllServiceOrderPart
-        {
-            Id = vm.Id,
-            ServiceOrderId = vm.ServiceOrderId,
-            SparePartId = vm.SparePartId,
-            Quantity = vm.Quantity,
-            UnitPrice = vm.Price <= 0 ? sparePart.UnitPrice : vm.Price
-        };
-
-        var result = await _appBll.ServiceOrderParts.UpdateAsync(entity);
         if (result == null) return NotFound();
-
-        await _appBll.ServiceOrderParts.RecalculateOrderTotalAsync(vm.ServiceOrderId);
-        await _appBll.SaveChangesAsync();
 
         return RedirectToAction(nameof(Index), new { serviceOrderId = vm.ServiceOrderId });
     }
 
     public async Task<IActionResult> Delete(Guid id)
     {
-        var entity = await _appBll.ServiceOrderParts.FindAsync(id);
+        var entity = await _mediator.Send(new GetServiceOrderPartByIdQuery(id));
         if (entity == null) return NotFound();
 
         return View(new ServiceOrderPartAdminViewModel
@@ -173,20 +144,30 @@ public class ServiceOrderPartsController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteConfirmed(Guid id)
     {
-        var entity = await _appBll.ServiceOrderParts.FindAsync(id);
-        if (entity == null) return NotFound();
+        // Capture the service order ID before deletion for the redirect.
+        var entity = await _mediator.Send(new GetServiceOrderPartByIdQuery(id));
+        var serviceOrderId = entity?.ServiceOrderId;
 
-        var orderId = entity.ServiceOrderId;
-        _appBll.ServiceOrderParts.Remove(entity);
-        await _appBll.ServiceOrderParts.RecalculateOrderTotalAsync(orderId);
-        await _appBll.SaveChangesAsync();
+        var deleted = await _mediator.Send(new DeleteServiceOrderPartCommand(id));
+        if (!deleted) return NotFound();
 
-        return RedirectToAction(nameof(Index), new { serviceOrderId = orderId });
+        return RedirectToAction(nameof(Index), new { serviceOrderId });
     }
 
-    private async Task PopulateOptions(ServiceOrderPartAdminViewModel vm)
+    private async Task PopulateOptionsAsync(ServiceOrderPartAdminViewModel vm)
     {
-        vm.ServiceOrderOptions = (await _appBll.ServiceOrders.GetSelectListForAdminAsync()).ToSelectListItems();
-        vm.SparePartOptions = (await _appBll.SpareParts.GetSelectListAsync()).ToSelectListItems();
+        var orderItems = await _mediator.Send(new GetServiceOrderSelectListQuery());
+        vm.ServiceOrderOptions = orderItems
+            .Select(i => new SelectListItem { Value = i.Value, Text = i.Text })
+            .ToList();
+
+        var spareParts = await _mediator.Send(new GetAllSparePartsQuery());
+        vm.SparePartOptions = spareParts
+            .Select(sp => new SelectListItem
+            {
+                Value = sp.Id.ToString(),
+                Text = string.IsNullOrEmpty(sp.PartNumber) ? sp.Name : $"{sp.Name} ({sp.PartNumber})"
+            })
+            .ToList();
     }
 }

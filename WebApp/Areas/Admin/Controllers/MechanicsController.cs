@@ -1,8 +1,9 @@
-using App.BLL;
-using App.BLL.DTO;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WebApp.Areas.Admin.ViewModels;
+using Workshops.Contracts.Commands;
+using Workshops.Contracts.Queries;
 
 namespace WebApp.Areas.Admin.Controllers;
 
@@ -10,16 +11,16 @@ namespace WebApp.Areas.Admin.Controllers;
 [Authorize(Roles = "admin")]
 public class MechanicsController : Controller
 {
-    private readonly IAppBll _appBll;
+    private readonly IMediator _mediator;
 
-    public MechanicsController(IAppBll appBll)
+    public MechanicsController(IMediator mediator)
     {
-        _appBll = appBll;
+        _mediator = mediator;
     }
 
     public async Task<IActionResult> Index()
     {
-        var mechanics = await _appBll.Mechanics.AllAsync();
+        var mechanics = await _mediator.Send(new GetAllMechanicsQuery());
         var vm = new MechanicListViewModel
         {
             Mechanics = mechanics.Select(m => new MechanicViewModel
@@ -46,17 +47,8 @@ public class MechanicsController : Controller
     {
         if (!ModelState.IsValid) return View(vm);
 
-        var mechanic = new BllMechanic
-        {
-            FirstName = vm.FirstName,
-            LastName = vm.LastName,
-            Phone = vm.Phone,
-            Email = vm.Email,
-            Specialization = vm.Specialization
-        };
-
-        _appBll.Mechanics.Add(mechanic);
-        await _appBll.SaveChangesAsync();
+        await _mediator.Send(new CreateMechanicCommand(
+            vm.FirstName, vm.LastName, vm.Phone, vm.Email, vm.Specialization));
 
         TempData["Success"] = $"Mechanic {vm.FirstName} {vm.LastName} created successfully.";
         return RedirectToAction(nameof(Index));
@@ -64,10 +56,10 @@ public class MechanicsController : Controller
 
     public async Task<IActionResult> Edit(Guid id)
     {
-        var mechanic = await _appBll.Mechanics.FindAsync(id);
+        var mechanic = await _mediator.Send(new GetMechanicByIdQuery(id));
         if (mechanic == null) return NotFound();
 
-        var vm = new MechanicViewModel
+        return View(new MechanicViewModel
         {
             Id = mechanic.Id,
             FirstName = mechanic.FirstName,
@@ -75,9 +67,7 @@ public class MechanicsController : Controller
             Phone = mechanic.Phone,
             Email = mechanic.Email,
             Specialization = mechanic.Specialization
-        };
-
-        return View(vm);
+        });
     }
 
     [HttpPost]
@@ -87,20 +77,8 @@ public class MechanicsController : Controller
         if (id != vm.Id) return BadRequest();
         if (!ModelState.IsValid) return View(vm);
 
-        var existing = await _appBll.Mechanics.FindAsync(id);
-        if (existing == null) return NotFound();
-
-        var mechanic = new BllMechanic
-        {
-            Id = vm.Id,
-            FirstName = vm.FirstName,
-            LastName = vm.LastName,
-            Phone = vm.Phone,
-            Email = vm.Email,
-            Specialization = vm.Specialization
-        };
-
-        var result = await _appBll.Mechanics.UpdateAsync(mechanic);
+        var result = await _mediator.Send(new UpdateMechanicCommand(
+            vm.Id, vm.FirstName, vm.LastName, vm.Phone, vm.Email, vm.Specialization));
         if (result == null) return NotFound();
 
         TempData["Success"] = $"Mechanic {vm.FirstName} {vm.LastName} updated successfully.";
@@ -109,10 +87,10 @@ public class MechanicsController : Controller
 
     public async Task<IActionResult> Delete(Guid id)
     {
-        var mechanic = await _appBll.Mechanics.FindAsync(id);
+        var mechanic = await _mediator.Send(new GetMechanicByIdQuery(id));
         if (mechanic == null) return NotFound();
 
-        var vm = new MechanicViewModel
+        return View(new MechanicViewModel
         {
             Id = mechanic.Id,
             FirstName = mechanic.FirstName,
@@ -120,20 +98,15 @@ public class MechanicsController : Controller
             Phone = mechanic.Phone,
             Email = mechanic.Email,
             Specialization = mechanic.Specialization
-        };
-
-        return View(vm);
+        });
     }
 
     [HttpPost, ActionName("Delete")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteConfirmed(Guid id)
     {
-        var mechanic = await _appBll.Mechanics.FindAsync(id);
-        if (mechanic == null) return NotFound();
-
-        _appBll.Mechanics.Remove(mechanic);
-        await _appBll.SaveChangesAsync();
+        var deleted = await _mediator.Send(new DeleteMechanicCommand(id));
+        if (!deleted) return NotFound();
 
         TempData["Success"] = "Mechanic deleted successfully.";
         return RedirectToAction(nameof(Index));
