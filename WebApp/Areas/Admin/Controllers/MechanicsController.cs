@@ -23,6 +23,7 @@ public class MechanicsController : Controller
         var mechanics = await _mediator.Send(new GetAllMechanicsQuery());
         var vm = new MechanicListViewModel
         {
+            PageTitle = "Mechanics",
             Mechanics = mechanics.Select(m => new MechanicViewModel
             {
                 Id = m.Id,
@@ -38,14 +39,14 @@ public class MechanicsController : Controller
 
     public IActionResult Create()
     {
-        return View(new MechanicViewModel());
+        return View(new MechanicViewModel { PageTitle = "Add Mechanic" });
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(MechanicViewModel vm)
     {
-        if (!ModelState.IsValid) return View(vm);
+        if (!ModelState.IsValid) { vm.PageTitle = "Add Mechanic"; return View(vm); }
 
         await _mediator.Send(new CreateMechanicCommand(
             vm.FirstName, vm.LastName, vm.Phone, vm.Email, vm.Specialization));
@@ -61,6 +62,7 @@ public class MechanicsController : Controller
 
         return View(new MechanicViewModel
         {
+            PageTitle = "Edit Mechanic",
             Id = mechanic.Id,
             FirstName = mechanic.FirstName,
             LastName = mechanic.LastName,
@@ -75,7 +77,7 @@ public class MechanicsController : Controller
     public async Task<IActionResult> Edit(Guid id, MechanicViewModel vm)
     {
         if (id != vm.Id) return BadRequest();
-        if (!ModelState.IsValid) return View(vm);
+        if (!ModelState.IsValid) { vm.PageTitle = "Edit Mechanic"; return View(vm); }
 
         var result = await _mediator.Send(new UpdateMechanicCommand(
             vm.Id, vm.FirstName, vm.LastName, vm.Phone, vm.Email, vm.Specialization));
@@ -92,6 +94,7 @@ public class MechanicsController : Controller
 
         return View(new MechanicViewModel
         {
+            PageTitle = "Delete Mechanic",
             Id = mechanic.Id,
             FirstName = mechanic.FirstName,
             LastName = mechanic.LastName,

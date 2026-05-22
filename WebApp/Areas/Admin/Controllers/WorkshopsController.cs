@@ -23,6 +23,7 @@ public class WorkshopsController : Controller
         var workshops = await _mediator.Send(new GetAllWorkshopsQuery());
         var vm = new WorkshopListViewModel
         {
+            PageTitle = "Workshops",
             Workshops = workshops.Select(w => new WorkshopViewModel
             {
                 Id = w.Id,
@@ -37,14 +38,14 @@ public class WorkshopsController : Controller
 
     public IActionResult Create()
     {
-        return View(new WorkshopViewModel());
+        return View(new WorkshopViewModel { PageTitle = "Add Workshop" });
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(WorkshopViewModel vm)
     {
-        if (!ModelState.IsValid) return View(vm);
+        if (!ModelState.IsValid) { vm.PageTitle = "Add Workshop"; return View(vm); }
 
         await _mediator.Send(new CreateWorkshopCommand(vm.Name, vm.Address, vm.Phone, vm.Email));
 
@@ -58,6 +59,7 @@ public class WorkshopsController : Controller
 
         return View(new WorkshopViewModel
         {
+            PageTitle = "Edit Workshop",
             Id = workshop.Id,
             Name = workshop.Name,
             Address = workshop.Address,
@@ -71,7 +73,7 @@ public class WorkshopsController : Controller
     public async Task<IActionResult> Edit(Guid id, WorkshopViewModel vm)
     {
         if (id != vm.Id) return BadRequest();
-        if (!ModelState.IsValid) return View(vm);
+        if (!ModelState.IsValid) { vm.PageTitle = "Edit Workshop"; return View(vm); }
 
         var result = await _mediator.Send(new UpdateWorkshopCommand(vm.Id, vm.Name, vm.Address, vm.Phone, vm.Email));
         if (result == null) return NotFound();
@@ -86,6 +88,7 @@ public class WorkshopsController : Controller
 
         return View(new WorkshopViewModel
         {
+            PageTitle = "Delete Workshop",
             Id = workshop.Id,
             Name = workshop.Name,
             Address = workshop.Address,
@@ -111,6 +114,7 @@ public class WorkshopsController : Controller
 
         return View(new WorkshopViewModel
         {
+            PageTitle = "Workshop Details",
             Id = workshop.Id,
             Name = workshop.Name,
             Address = workshop.Address,

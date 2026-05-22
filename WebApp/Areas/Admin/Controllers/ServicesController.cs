@@ -23,6 +23,7 @@ public class ServicesController : Controller
         var services = await _mediator.Send(new GetAllServicesQuery());
         var vm = new ServiceAdminListViewModel
         {
+            PageTitle = "Services",
             Services = services.Select(s => new ServiceAdminViewModel
             {
                 Id = s.Id,
@@ -37,14 +38,14 @@ public class ServicesController : Controller
 
     public IActionResult Create()
     {
-        return View(new ServiceAdminViewModel());
+        return View(new ServiceAdminViewModel { PageTitle = "Add Service" });
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(ServiceAdminViewModel vm)
     {
-        if (!ModelState.IsValid) return View(vm);
+        if (!ModelState.IsValid) { vm.PageTitle = "Add Service"; return View(vm); }
 
         await _mediator.Send(new CreateServiceCommand(
             vm.Name, vm.Description, vm.BasePrice, vm.EstimatedTimeMinutes));
@@ -60,6 +61,7 @@ public class ServicesController : Controller
 
         return View(new ServiceAdminViewModel
         {
+            PageTitle = "Edit Service",
             Id = service.Id,
             Name = service.Name,
             Description = service.Description ?? string.Empty,
@@ -73,7 +75,7 @@ public class ServicesController : Controller
     public async Task<IActionResult> Edit(Guid id, ServiceAdminViewModel vm)
     {
         if (id != vm.Id) return BadRequest();
-        if (!ModelState.IsValid) return View(vm);
+        if (!ModelState.IsValid) { vm.PageTitle = "Edit Service"; return View(vm); }
 
         var result = await _mediator.Send(new UpdateServiceCommand(
             vm.Id, vm.Name, vm.Description, vm.BasePrice, vm.EstimatedTimeMinutes));
@@ -90,6 +92,7 @@ public class ServicesController : Controller
 
         return View(new ServiceAdminViewModel
         {
+            PageTitle = "Delete Service",
             Id = service.Id,
             Name = service.Name,
             Description = service.Description ?? string.Empty,
@@ -116,6 +119,7 @@ public class ServicesController : Controller
 
         return View(new ServiceAdminViewModel
         {
+            PageTitle = "Service Details",
             Id = service.Id,
             Name = service.Name,
             Description = service.Description ?? string.Empty,

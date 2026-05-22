@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace WebApp.Areas.Admin.ViewModels;
 
-public class MechanicViewModel
+public class MechanicViewModel : AdminPageViewModelBase
 {
     public Guid Id { get; set; }
 
@@ -27,7 +27,7 @@ public class MechanicViewModel
     public string FullName => $"{FirstName} {LastName}";
 }
 
-public class MechanicListViewModel
+public class MechanicListViewModel : AdminPageViewModelBase
 {
     public List<MechanicViewModel> Mechanics { get; set; } = new();
 }

@@ -23,6 +23,7 @@ public class SparePartsController : Controller
         var parts = await _mediator.Send(new GetAllSparePartsQuery());
         var vm = new SparePartAdminListViewModel
         {
+            PageTitle = "Spare Parts",
             SpareParts = parts.Select(sp => new SparePartAdminViewModel
             {
                 Id = sp.Id,
@@ -37,14 +38,14 @@ public class SparePartsController : Controller
 
     public IActionResult Create()
     {
-        return View(new SparePartAdminViewModel());
+        return View(new SparePartAdminViewModel { PageTitle = "Add Spare Part" });
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(SparePartAdminViewModel vm)
     {
-        if (!ModelState.IsValid) return View(vm);
+        if (!ModelState.IsValid) { vm.PageTitle = "Add Spare Part"; return View(vm); }
 
         await _mediator.Send(new CreateSparePartCommand(
             vm.Name ?? "", vm.PartNumber, vm.UnitPrice, vm.StockQuantity));
@@ -60,6 +61,7 @@ public class SparePartsController : Controller
 
         return View(new SparePartAdminViewModel
         {
+            PageTitle = "Edit Spare Part",
             Id = part.Id,
             Name = part.Name,
             PartNumber = part.PartNumber,
@@ -73,7 +75,7 @@ public class SparePartsController : Controller
     public async Task<IActionResult> Edit(Guid id, SparePartAdminViewModel vm)
     {
         if (id != vm.Id) return BadRequest();
-        if (!ModelState.IsValid) return View(vm);
+        if (!ModelState.IsValid) { vm.PageTitle = "Edit Spare Part"; return View(vm); }
 
         var result = await _mediator.Send(new UpdateSparePartCommand(
             vm.Id, vm.Name ?? "", vm.PartNumber, vm.UnitPrice, vm.StockQuantity));
@@ -90,6 +92,7 @@ public class SparePartsController : Controller
 
         return View(new SparePartAdminViewModel
         {
+            PageTitle = "Delete Spare Part",
             Id = part.Id,
             Name = part.Name,
             PartNumber = part.PartNumber,

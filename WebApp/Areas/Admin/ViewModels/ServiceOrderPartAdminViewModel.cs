@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace WebApp.Areas.Admin.ViewModels;
 
-public class ServiceOrderPartAdminViewModel
+public class ServiceOrderPartAdminViewModel : AdminPageViewModelBase
 {
     public Guid Id { get; set; }
 
@@ -24,7 +24,7 @@ public class ServiceOrderPartAdminViewModel
     public IEnumerable<SelectListItem> SparePartOptions { get; set; } = new List<SelectListItem>();
 }
 
-public class ServiceOrderPartAdminListViewModel
+public class ServiceOrderPartAdminListViewModel : AdminPageViewModelBase
 {
     public Guid? ServiceOrderId { get; set; }
     public List<ServiceOrderPartAdminViewModel> Parts { get; set; } = new();

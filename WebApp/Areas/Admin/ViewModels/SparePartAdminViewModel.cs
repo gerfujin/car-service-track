@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace WebApp.Areas.Admin.ViewModels;
 
-public class SparePartAdminViewModel
+public class SparePartAdminViewModel : AdminPageViewModelBase
 {
     public Guid Id { get; set; }
 
@@ -24,7 +24,7 @@ public class SparePartAdminViewModel
     public int StockQuantity { get; set; }
 }
 
-public class SparePartAdminListViewModel
+public class SparePartAdminListViewModel : AdminPageViewModelBase
 {
     public List<SparePartAdminViewModel> SpareParts { get; set; } = new();
 }

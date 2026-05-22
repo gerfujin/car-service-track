@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace WebApp.Areas.Admin.ViewModels;
 
-public class WorkshopViewModel
+public class WorkshopViewModel : AdminPageViewModelBase
 {
     public Guid Id { get; set; }
 
@@ -19,7 +19,7 @@ public class WorkshopViewModel
     public string? Email { get; set; }
 }
 
-public class WorkshopListViewModel
+public class WorkshopListViewModel : AdminPageViewModelBase
 {
     public IEnumerable<WorkshopViewModel> Workshops { get; set; } = new List<WorkshopViewModel>();
 }

@@ -26,6 +26,7 @@ public class ServiceOrdersController : Controller
         var orders = await _mediator.Send(new GetAllServiceOrdersQuery());
         var vm = new ServiceOrderAdminListViewModel
         {
+            PageTitle = "Service Orders",
             Orders = orders.Select(so => new ServiceOrderAdminViewModel
             {
                 Id = so.Id,
@@ -53,6 +54,7 @@ public class ServiceOrdersController : Controller
 
         var vm = new ServiceOrderStatusUpdateViewModel
         {
+            PageTitle = "Update Order Status",
             Id = order.Id,
             CurrentStatus = order.Status,
             NewStatus = order.Status,
@@ -75,6 +77,7 @@ public class ServiceOrdersController : Controller
 
         if (!ModelState.IsValid)
         {
+            vm.PageTitle = "Update Order Status";
             vm.StatusOptions = Enum.GetValues<ServiceOrderStatus>()
                 .Select(s => new SelectListItem { Value = ((int)s).ToString(), Text = s.ToString() })
                 .ToList();

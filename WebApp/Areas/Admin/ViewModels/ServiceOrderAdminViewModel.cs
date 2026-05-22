@@ -22,12 +22,12 @@ public class ServiceOrderAdminViewModel
     public bool HasPayment { get; set; }
 }
 
-public class ServiceOrderAdminListViewModel
+public class ServiceOrderAdminListViewModel : AdminPageViewModelBase
 {
     public IEnumerable<ServiceOrderAdminViewModel> Orders { get; set; } = new List<ServiceOrderAdminViewModel>();
 }
 
-public class ServiceOrderStatusUpdateViewModel
+public class ServiceOrderStatusUpdateViewModel : AdminPageViewModelBase
 {
     public Guid Id { get; set; }
     public ServiceOrderStatus CurrentStatus { get; set; }

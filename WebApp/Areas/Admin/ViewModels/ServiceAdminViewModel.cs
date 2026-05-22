@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace WebApp.Areas.Admin.ViewModels;
 
-public class ServiceAdminViewModel
+public class ServiceAdminViewModel : AdminPageViewModelBase
 {
     public Guid Id { get; set; }
 
@@ -24,7 +24,7 @@ public class ServiceAdminViewModel
     public int EstimatedTimeMinutes { get; set; }
 }
 
-public class ServiceAdminListViewModel
+public class ServiceAdminListViewModel : AdminPageViewModelBase
 {
     public List<ServiceAdminViewModel> Services { get; set; } = new();
 }

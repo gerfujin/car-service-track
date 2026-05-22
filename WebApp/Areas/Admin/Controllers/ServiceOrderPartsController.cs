@@ -25,6 +25,7 @@ public class ServiceOrderPartsController : Controller
         var parts = await _mediator.Send(new GetAllServiceOrderPartsQuery(serviceOrderId));
         return View(new ServiceOrderPartAdminListViewModel
         {
+            PageTitle = "Service Order Parts",
             ServiceOrderId = serviceOrderId,
             Parts = parts.Select(x => new ServiceOrderPartAdminViewModel
             {
@@ -45,6 +46,7 @@ public class ServiceOrderPartsController : Controller
 
         return View(new ServiceOrderPartAdminViewModel
         {
+            PageTitle = "Order Part Details",
             Id = entity.Id,
             ServiceOrderId = entity.ServiceOrderId,
             SparePartId = entity.SparePartId,
@@ -58,6 +60,7 @@ public class ServiceOrderPartsController : Controller
     {
         var vm = new ServiceOrderPartAdminViewModel
         {
+            PageTitle = "Add Order Part",
             ServiceOrderId = serviceOrderId ?? Guid.Empty,
             Quantity = 1
         };
@@ -71,6 +74,7 @@ public class ServiceOrderPartsController : Controller
     {
         if (!ModelState.IsValid)
         {
+            vm.PageTitle = "Add Order Part";
             await PopulateOptionsAsync(vm);
             return View(vm);
         }
@@ -80,6 +84,7 @@ public class ServiceOrderPartsController : Controller
 
         if (result == null)
         {
+            vm.PageTitle = "Add Order Part";
             TempData["Error"] = "Service order or spare part not found.";
             await PopulateOptionsAsync(vm);
             return View(vm);
@@ -95,6 +100,7 @@ public class ServiceOrderPartsController : Controller
 
         var vm = new ServiceOrderPartAdminViewModel
         {
+            PageTitle = "Edit Order Part",
             Id = entity.Id,
             ServiceOrderId = entity.ServiceOrderId,
             SparePartId = entity.SparePartId,
@@ -112,6 +118,7 @@ public class ServiceOrderPartsController : Controller
         if (id != vm.Id) return BadRequest();
         if (!ModelState.IsValid)
         {
+            vm.PageTitle = "Edit Order Part";
             await PopulateOptionsAsync(vm);
             return View(vm);
         }
@@ -131,6 +138,7 @@ public class ServiceOrderPartsController : Controller
 
         return View(new ServiceOrderPartAdminViewModel
         {
+            PageTitle = "Delete Order Part",
             Id = entity.Id,
             ServiceOrderId = entity.ServiceOrderId,
             SparePartId = entity.SparePartId,

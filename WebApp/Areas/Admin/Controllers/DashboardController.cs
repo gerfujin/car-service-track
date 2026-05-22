@@ -23,6 +23,7 @@ public class DashboardController : Controller
 
         var vm = new DashboardViewModel
         {
+            PageTitle = "Dashboard",
             TotalVehicles = stats.TotalVehicles,
             TotalServiceOrders = stats.TotalServiceOrders,
             TotalWorkshops = stats.TotalWorkshops,

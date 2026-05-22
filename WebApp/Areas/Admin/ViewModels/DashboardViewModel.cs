@@ -1,6 +1,6 @@
 namespace WebApp.Areas.Admin.ViewModels;
 
-public class DashboardViewModel
+public class DashboardViewModel : AdminPageViewModelBase
 {
     public int TotalVehicles { get; set; }
     public int TotalServiceOrders { get; set; }
