@@ -1,0 +1,36 @@
+using Orders.Application.DTO;
+using Orders.Domain;
+
+namespace Orders.Application.Mappers;
+
+public static class RepairPhotoMapper
+{
+    public static BllRepairPhoto? ToBll(RepairPhoto? entity)
+    {
+        if (entity == null) return null;
+
+        return new BllRepairPhoto
+        {
+            Id = entity.Id,
+            FilePath = entity.FilePath,
+            Description = entity.Description,
+            UploadedAt = entity.UploadedAt,
+            ServiceOrderId = entity.ServiceOrderId,
+            OwnerId = entity.ServiceOrder?.AppUserId
+        };
+    }
+
+    public static RepairPhoto? ToDomain(BllRepairPhoto? bll)
+    {
+        if (bll == null) return null;
+
+        return new RepairPhoto
+        {
+            Id = bll.Id,
+            FilePath = bll.FilePath,
+            Description = bll.Description,
+            UploadedAt = bll.UploadedAt,
+            ServiceOrderId = bll.ServiceOrderId
+        };
+    }
+}

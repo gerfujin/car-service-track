@@ -1,13 +1,16 @@
-using App.BLL.DTO;
+using App.Domain.Enums;
 using App.DTO.v1.Service;
 using App.DTO.v1.ServiceOrder;
+using Orders.Application.DTO;
 
 namespace WebApp.Mappers;
 
 /// <summary>
-/// Maps the BLL DTO (BllServiceOrder) to the API DTO (ServiceOrderDto).
+/// Maps the module BLL DTO (Orders.Application.DTO.BllServiceOrder) to the API DTO (ServiceOrderDto).
 /// Mirrors the two shapes the old controller produced: the list omits the Services
 /// detail section, the detail (get-by-id) includes it.
+/// Note: Orders.Domain.Enums.ServiceOrderStatus and App.Domain.Enums.ServiceOrderStatus share
+/// identical numeric values (0–5), so the int-cast is lossless.
 /// </summary>
 public static class ServiceOrderApiMapper
 {
@@ -16,7 +19,7 @@ public static class ServiceOrderApiMapper
     {
         Id = o.Id,
         Description = o.Description,
-        Status = o.Status,
+        Status = (ServiceOrderStatus)(int)o.Status,
         OrderDate = o.OrderDate,
         CompletedDate = o.CompletedDate,
         VehicleId = o.VehicleId,

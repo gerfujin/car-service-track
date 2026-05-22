@@ -1,10 +1,11 @@
-using App.BLL;
 using App.DTO.v1;
 using App.DTO.v1.SparePart;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Workshops.Application.Services;
+using Workshops.Contracts;
 using WebApp.Mappers;
 
 namespace WebApp.ApiControllers;
@@ -15,11 +16,13 @@ namespace WebApp.ApiControllers;
 [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
 public class SparePartsController : ControllerBase
 {
-    private readonly IAppBll _bll;
+    private readonly ISparePartService _spareParts;
+    private readonly IWorkshopsUnitOfWork _workshopsUow;
 
-    public SparePartsController(IAppBll bll)
+    public SparePartsController(ISparePartService spareParts, IWorkshopsUnitOfWork workshopsUow)
     {
-        _bll = bll;
+        _spareParts = spareParts;
+        _workshopsUow = workshopsUow;
     }
 
     /// <summary>Get all spare parts (admin only)</summary>
@@ -29,7 +32,7 @@ public class SparePartsController : ControllerBase
     [ProducesResponseType<IEnumerable<SparePartDto>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<SparePartDto>>> GetSpareParts()
     {
-        var parts = (await _bll.SpareParts.AllAsync())
+        var parts = (await _spareParts.AllAsync())
             .Select(SparePartApiMapper.ToApiDto)
             .ToList();
 
@@ -44,7 +47,7 @@ public class SparePartsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<SparePartDto>> GetSparePart(Guid id)
     {
-        var part = await _bll.SpareParts.FindAsync(id);
+        var part = await _spareParts.FindAsync(id);
         if (part == null) return NotFound();
 
         return Ok(SparePartApiMapper.ToApiDto(part));
@@ -68,8 +71,8 @@ public class SparePartsController : ControllerBase
             });
         }
 
-        var created = _bll.SpareParts.Add(SparePartApiMapper.ToBll(dto));
-        await _bll.SaveChangesAsync();
+        var created = _spareParts.Add(SparePartApiMapper.ToBll(dto));
+        await _workshopsUow.SaveChangesAsync();
 
         return CreatedAtAction(nameof(GetSparePart), new { id = created.Id }, SparePartApiMapper.ToCreatedApiDto(created));
     }
@@ -91,10 +94,10 @@ public class SparePartsController : ControllerBase
             });
         }
 
-        var updated = await _bll.SpareParts.UpdateAsync(SparePartApiMapper.ToBll(dto, id));
+        var updated = await _spareParts.UpdateAsync(SparePartApiMapper.ToBll(dto, id));
         if (updated == null) return NotFound();
 
-        await _bll.SaveChangesAsync();
+        await _workshopsUow.SaveChangesAsync();
 
         return NoContent();
     }
@@ -106,11 +109,11 @@ public class SparePartsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteSparePart(Guid id)
     {
-        var part = await _bll.SpareParts.FindAsync(id);
+        var part = await _spareParts.FindAsync(id);
         if (part == null) return NotFound();
 
-        _bll.SpareParts.Remove(part);
-        await _bll.SaveChangesAsync();
+        _spareParts.Remove(part);
+        await _workshopsUow.SaveChangesAsync();
 
         return NoContent();
     }

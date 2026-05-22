@@ -1,6 +1,6 @@
-using App.BLL;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
+using Workshops.Application.Services;
 using WebApp.Mappers;
 
 namespace WebApp.ApiControllers;
@@ -10,11 +10,11 @@ namespace WebApp.ApiControllers;
 [Route("/api/v{version:apiVersion}/[controller]")]
 public class WorkshopsController : ControllerBase
 {
-    private readonly IAppBll _bll;
+    private readonly IWorkshopService _workshops;
 
-    public WorkshopsController(IAppBll bll)
+    public WorkshopsController(IWorkshopService workshops)
     {
-        _bll = bll;
+        _workshops = workshops;
     }
 
     /// <summary>Get all workshops (public)</summary>
@@ -23,7 +23,7 @@ public class WorkshopsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetWorkshops()
     {
-        var workshops = (await _bll.Workshops.AllAsync())
+        var workshops = (await _workshops.AllAsync())
             .Select(WorkshopApiMapper.ToApiDto)
             .ToList();
 
@@ -37,7 +37,7 @@ public class WorkshopsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetWorkshop(Guid id)
     {
-        var workshop = await _bll.Workshops.FindAsync(id);
+        var workshop = await _workshops.FindAsync(id);
         if (workshop == null) return NotFound();
         return Ok(WorkshopApiMapper.ToApiDto(workshop));
     }

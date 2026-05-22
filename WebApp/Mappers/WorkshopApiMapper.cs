@@ -1,9 +1,9 @@
-using App.BLL.DTO;
 using App.DTO.v1.Workshop;
+using Workshops.Application.DTO;
 
 namespace WebApp.Mappers;
 
-/// <summary>Maps the BLL DTO (BllWorkshop) to the API DTO (App.DTO.v1.Workshop.WorkshopDto).</summary>
+/// <summary>Maps the module BLL DTO (Workshops.Application.DTO.BllWorkshop) to the API DTO (App.DTO.v1.Workshop.WorkshopDto).</summary>
 public static class WorkshopApiMapper
 {
     public static WorkshopDto ToApiDto(BllWorkshop w) => new()

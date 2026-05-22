@@ -1,35 +1,55 @@
+using System.Data.Common;
 using App.DAL.EF;
 using CarServiceTrack.Tests.Integration.Helpers;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
+using Orders.Infrastructure;
+using Users.Infrastructure;
+using Workshops.Infrastructure;
 
 namespace CarServiceTrack.Tests.Integration;
 
 /// <summary>
-/// Replaces PostgreSQL with a named SQLite in-memory database so integration tests
-/// never touch a real server. A keep-alive connection prevents SQLite from
-/// destroying the in-memory database between EF Core DbContext lifetimes.
+/// Replaces PostgreSQL with named SQLite in-memory databases so integration tests
+/// never touch a real server. Each DbContext (AppDbContext + 3 module DbContexts)
+/// gets its own unique named database and a keep-alive connection so the in-memory
+/// database persists across EF Core DbContext lifetimes within the same test.
 /// </summary>
 public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
-    // Unique per-factory database name so parallel test classes don't collide.
-    private readonly string _connectionString =
-        $"DataSource=cst_{Guid.NewGuid():N};Mode=Memory;Cache=Shared";
+    // Unique per-factory database names so parallel test classes don't collide.
+    private readonly string _appConnectionString =
+        $"DataSource=cst_app_{Guid.NewGuid():N};Mode=Memory;Cache=Shared";
+    private readonly string _usersConnectionString =
+        $"DataSource=cst_users_{Guid.NewGuid():N};Mode=Memory;Cache=Shared";
+    private readonly string _workshopsConnectionString =
+        $"DataSource=cst_workshops_{Guid.NewGuid():N};Mode=Memory;Cache=Shared";
+    private readonly string _ordersConnectionString =
+        $"DataSource=cst_orders_{Guid.NewGuid():N};Mode=Memory;Cache=Shared";
 
-    // Keep this connection open for the entire lifetime of the factory so the
-    // in-memory SQLite database is not destroyed between request-scoped DbContexts.
-    private readonly SqliteConnection _keepAlive;
+    // Keep connections open for the entire lifetime of the factory so the
+    // in-memory SQLite databases are not destroyed between request-scoped DbContexts.
+    private readonly SqliteConnection _appKeepAlive;
+    private readonly SqliteConnection _usersKeepAlive;
+    private readonly SqliteConnection _workshopsKeepAlive;
+    private readonly SqliteConnection _ordersKeepAlive;
 
     public CustomWebApplicationFactory()
     {
-        _keepAlive = new SqliteConnection(_connectionString);
-        _keepAlive.Open();
+        _appKeepAlive = new SqliteConnection(_appConnectionString);
+        _appKeepAlive.Open();
+        _usersKeepAlive = new SqliteConnection(_usersConnectionString);
+        _usersKeepAlive.Open();
+        _workshopsKeepAlive = new SqliteConnection(_workshopsConnectionString);
+        _workshopsKeepAlive.Open();
+        _ordersKeepAlive = new SqliteConnection(_ordersConnectionString);
+        _ordersKeepAlive.Open();
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -67,67 +87,142 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
         builder.ConfigureServices(services =>
         {
-            // EF Core 9/10 registers an IDbContextOptionsConfiguration<AppDbContext>
-            // delegate via Add (not TryAdd) inside AddDbContext. Calling AddDbContext
-            // again for SQLite would therefore ADD a second provider delegate, so both
-            // Npgsql and SQLite get applied → "Only a single database provider can be
-            // registered". We must strip every EF registration tied to the original
-            // Npgsql AppDbContext before re-registering SQLite.
-            var toRemove = services.Where(d =>
-                    d.ServiceType == typeof(DbContextOptions<AppDbContext>) ||
-                    d.ServiceType == typeof(DbContextOptions) ||
-                    d.ServiceType == typeof(AppDbContext) ||
-                    (d.ServiceType.IsGenericType &&
-                     d.ServiceType.GetGenericTypeDefinition().Name
-                         .StartsWith("IDbContextOptionsConfiguration")))
-                .ToList();
+            // ── Replace AppDbContext ─────────────────────────────────────────────
+            // EF Core 9/10 registers IDbContextOptionsConfiguration<T> delegates
+            // via Add (not TryAdd). Calling AddDbContext again would ADD a second
+            // provider delegate → "Only a single database provider can be registered".
+            // Strip every EF registration tied to AppDbContext before re-registering.
+            RemoveDbContextRegistrations<AppDbContext>(services);
 
-            foreach (var descriptor in toRemove)
-            {
-                services.Remove(descriptor);
-            }
-
-            // Re-register AppDbContext pointing at the SQLite in-memory database.
-            // Mirror the production query-tracking behavior: the real Program.cs uses
-            // NoTrackingWithIdentityResolution. Without it the default (TrackAll) makes
-            // FindAsync track an entity that Remove/Update then re-attaches by key,
-            // throwing "another instance with the same key value is already tracked".
             services.AddDbContext<AppDbContext>(options =>
                 options
-                    .UseSqlite(_connectionString)
+                    .UseSqlite(_appConnectionString)
+                    .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTrackingWithIdentityResolution));
+
+            // ── Replace module DbContexts ───────────────────────────────────────
+            // Module DbContexts are registered by AddUsersModule / AddWorkshopsModule /
+            // AddOrdersModule in Program.cs. Replace Postgres with SQLite in-memory.
+            RemoveDbContextRegistrations<UsersDbContext>(services);
+            services.AddDbContext<UsersDbContext>(options =>
+                options
+                    .UseSqlite(_usersConnectionString)
+                    // UsersDbContext has FK: Owner.AppUserId → users.AspNetUsers.Id and
+                    // AppRefreshToken.AppUserId → users.AspNetUsers.Id.  In tests, identity
+                    // users live only in AppDbContext's SQLite (via UserManager), so these
+                    // cross-DB FKs would always fail.  Disable FK enforcement on every
+                    // connection so the module works the same way it will in production
+                    // PostgreSQL (where the FK references a schema managed by AppDbContext).
+                    .AddInterceptors(new DisableForeignKeysInterceptor())
+                    .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTrackingWithIdentityResolution));
+
+            RemoveDbContextRegistrations<WorkshopsDbContext>(services);
+            services.AddDbContext<WorkshopsDbContext>(options =>
+                options
+                    .UseSqlite(_workshopsConnectionString)
+                    .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTrackingWithIdentityResolution));
+
+            RemoveDbContextRegistrations<OrdersDbContext>(services);
+            services.AddDbContext<OrdersDbContext>(options =>
+                options
+                    .UseSqlite(_ordersConnectionString)
                     .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTrackingWithIdentityResolution));
         });
     }
 
     /// <summary>
-    /// Creates the schema and runs the caller-supplied seeder inside a dedicated
-    /// scope, returning whatever the seeder produces (e.g. a <see cref="Fixtures.SeedResult"/>).
+    /// Strips all EF Core service registrations for a specific DbContext type
+    /// so the context can be re-registered with a different provider.
+    /// </summary>
+    private static void RemoveDbContextRegistrations<TContext>(IServiceCollection services)
+        where TContext : DbContext
+    {
+        var toRemove = services.Where(d =>
+                d.ServiceType == typeof(DbContextOptions<TContext>) ||
+                d.ServiceType == typeof(TContext) ||
+                (d.ServiceType == typeof(DbContextOptions)) ||
+                (d.ServiceType.IsGenericType &&
+                 d.ServiceType.GetGenericTypeDefinition().Name
+                     .StartsWith("IDbContextOptionsConfiguration") &&
+                 d.ServiceType.GenericTypeArguments.Length == 1 &&
+                 d.ServiceType.GenericTypeArguments[0] == typeof(TContext)))
+            .ToList();
+
+        foreach (var descriptor in toRemove)
+        {
+            services.Remove(descriptor);
+        }
+    }
+
+    /// <summary>
+    /// Creates the schema for ALL DbContexts and runs the caller-supplied seeder inside
+    /// a dedicated scope, returning whatever the seeder produces.
     /// Call once per test-class <c>IAsyncLifetime.InitializeAsync</c>.
     /// </summary>
     public async Task<T> InitializeDbAsync<T>(Func<IServiceProvider, Task<T>> seed)
     {
         using var scope = Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        // EnsureCreated builds the schema from the EF model — no PG migrations needed.
-        await db.Database.EnsureCreatedAsync();
-        return await seed(scope.ServiceProvider);
+        var sp = scope.ServiceProvider;
+
+        // Create schemas for all contexts before seeding.
+        await sp.GetRequiredService<AppDbContext>().Database.EnsureCreatedAsync();
+        await sp.GetRequiredService<UsersDbContext>().Database.EnsureCreatedAsync();
+        await sp.GetRequiredService<WorkshopsDbContext>().Database.EnsureCreatedAsync();
+        await sp.GetRequiredService<OrdersDbContext>().Database.EnsureCreatedAsync();
+
+        return await seed(sp);
     }
 
     /// <summary>Overload for seeders that return no value.</summary>
     public async Task InitializeDbAsync(Func<IServiceProvider, Task> seed)
     {
         using var scope = Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        await db.Database.EnsureCreatedAsync();
-        await seed(scope.ServiceProvider);
+        var sp = scope.ServiceProvider;
+
+        await sp.GetRequiredService<AppDbContext>().Database.EnsureCreatedAsync();
+        await sp.GetRequiredService<UsersDbContext>().Database.EnsureCreatedAsync();
+        await sp.GetRequiredService<WorkshopsDbContext>().Database.EnsureCreatedAsync();
+        await sp.GetRequiredService<OrdersDbContext>().Database.EnsureCreatedAsync();
+
+        await seed(sp);
     }
 
     protected override void Dispose(bool disposing)
     {
         if (disposing)
         {
-            _keepAlive.Dispose();
+            _appKeepAlive.Dispose();
+            _usersKeepAlive.Dispose();
+            _workshopsKeepAlive.Dispose();
+            _ordersKeepAlive.Dispose();
         }
         base.Dispose(disposing);
+    }
+}
+
+/// <summary>
+/// Sends PRAGMA foreign_keys = OFF after every SQLite connection is opened.
+/// Used for UsersDbContext in tests because Owner.AppUserId and
+/// AppRefreshToken.AppUserId reference users.AspNetUsers, which is a separate
+/// SQLite database from where UserManager stores identity (AppDbContext).
+/// Without this interceptor every insert of an Owner or RefreshToken would fail
+/// with "FOREIGN KEY constraint failed".
+/// </summary>
+internal sealed class DisableForeignKeysInterceptor : DbConnectionInterceptor
+{
+    public override void ConnectionOpened(DbConnection connection, ConnectionEndEventData eventData)
+    {
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "PRAGMA foreign_keys = OFF;";
+        cmd.ExecuteNonQuery();
+    }
+
+    public override async Task ConnectionOpenedAsync(
+        DbConnection connection,
+        ConnectionEndEventData eventData,
+        CancellationToken cancellationToken = default)
+    {
+        await using var cmd = connection.CreateCommand();
+        cmd.CommandText = "PRAGMA foreign_keys = OFF;";
+        await cmd.ExecuteNonQueryAsync(cancellationToken);
     }
 }

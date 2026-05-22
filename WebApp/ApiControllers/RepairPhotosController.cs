@@ -1,5 +1,3 @@
-using App.BLL;
-using App.BLL.DTO;
 using App.DTO.v1;
 using App.DTO.v1.RepairPhoto;
 using Asp.Versioning;
@@ -7,6 +5,9 @@ using Base.Helpers;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Orders.Application.DTO;
+using Orders.Application.Services;
+using Orders.Contracts;
 using WebApp.Mappers;
 
 namespace WebApp.ApiControllers;
@@ -17,12 +18,14 @@ namespace WebApp.ApiControllers;
 [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
 public class RepairPhotosController : ControllerBase
 {
-    private readonly IAppBll _bll;
+    private readonly IRepairPhotoService _repairPhotos;
+    private readonly IOrdersUnitOfWork _ordersUow;
     private readonly IWebHostEnvironment _env;
 
-    public RepairPhotosController(IAppBll bll, IWebHostEnvironment env)
+    public RepairPhotosController(IRepairPhotoService repairPhotos, IOrdersUnitOfWork ordersUow, IWebHostEnvironment env)
     {
-        _bll = bll;
+        _repairPhotos = repairPhotos;
+        _ordersUow = ordersUow;
         _env = env;
     }
 
@@ -62,7 +65,7 @@ public class RepairPhotosController : ControllerBase
         var isMechanic = IsMechanic();
         var appUserId = isAdmin || isMechanic ? Guid.Empty : GetCurrentUserId();
 
-        var photos = (await _bll.RepairPhotos.AllForApiAsync(serviceOrderId, appUserId, isAdmin, isMechanic))
+        var photos = (await _repairPhotos.AllForApiAsync(serviceOrderId, appUserId, isAdmin, isMechanic))
             .Select(RepairPhotoApiMapper.ToApiDto)
             .ToList();
 
@@ -84,15 +87,11 @@ public class RepairPhotosController : ControllerBase
         var isMechanic = IsMechanic();
         var appUserId = isAdmin || isMechanic ? Guid.Empty : GetCurrentUserId();
 
-        var photo = await _bll.RepairPhotos.FindForApiAsync(id, appUserId, isAdmin, isMechanic);
+        var photo = await _repairPhotos.FindForApiAsync(id, appUserId, isAdmin, isMechanic);
         if (photo == null) return NotFound();
         return Ok(RepairPhotoApiMapper.ToApiDto(photo));
     }
 
-    /// <summary>
-    /// Upload a new repair photo for a service order.
-    /// Admin/Mechanic only. Max 15 MB, JPG/PNG, max 20 photos per order.
-    /// </summary>
     /// <summary>
     /// Upload a new repair photo for a service order.
     /// Admin/Mechanic only. Max 15 MB, JPG/PNG, max 20 photos per order.
@@ -137,7 +136,7 @@ public class RepairPhotosController : ControllerBase
         }
 
         // --- Validate service order exists and photo count limit ---
-        var validation = await _bll.RepairPhotos.ValidateUploadAsync(serviceOrderId);
+        var validation = await _repairPhotos.ValidateUploadAsync(serviceOrderId);
         if (validation.Error != null)
         {
             return BadRequest(ErrorResponse(validation.Error));
@@ -157,14 +156,14 @@ public class RepairPhotosController : ControllerBase
 
         // --- Persist DB record ---
         var relativeUrl = $"/uploads/repair-photos/{fileName}";
-        var photo = _bll.RepairPhotos.AddUploaded(new BllRepairPhoto
+        var photo = _repairPhotos.AddUploaded(new BllRepairPhoto
         {
             FilePath = relativeUrl,
             Description = description,
             ServiceOrderId = serviceOrderId
         });
 
-        await _bll.SaveChangesAsync();
+        await _ordersUow.SaveChangesAsync();
 
         return CreatedAtAction(nameof(GetPhoto), new { id = photo.Id }, RepairPhotoApiMapper.ToApiDto(photo));
     }
@@ -179,7 +178,7 @@ public class RepairPhotosController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeletePhoto(Guid id)
     {
-        var result = await _bll.RepairPhotos.RemoveForApiAsync(id);
+        var result = await _repairPhotos.RemoveForApiAsync(id);
         if (result.NotFound) return NotFound();
 
         var photo = result.Entity!;
@@ -203,7 +202,7 @@ public class RepairPhotosController : ControllerBase
             }
         }
 
-        await _bll.SaveChangesAsync();
+        await _ordersUow.SaveChangesAsync();
 
         return NoContent();
     }

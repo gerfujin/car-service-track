@@ -1,5 +1,3 @@
-using App.BLL;
-using App.BLL.DTO;
 using App.DTO.v1;
 using App.DTO.v1.Vehicle;
 using Asp.Versioning;
@@ -8,6 +6,9 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Orders.Application.Services;
+using Users.Application.Services;
+using Users.Contracts;
 using WebApp.Mappers;
 
 namespace WebApp.ApiControllers;
@@ -18,11 +19,18 @@ namespace WebApp.ApiControllers;
 [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
 public class VehiclesController : ControllerBase
 {
-    private readonly IAppBll _bll;
+    private readonly IVehicleService _vehicles;
+    private readonly IOwnerService _owners;
+    private readonly IServiceOrderService _serviceOrders;
+    private readonly IUsersUnitOfWork _usersUow;
 
-    public VehiclesController(IAppBll bll)
+    public VehiclesController(IVehicleService vehicles, IOwnerService owners,
+        IServiceOrderService serviceOrders, IUsersUnitOfWork usersUow)
     {
-        _bll = bll;
+        _vehicles = vehicles;
+        _owners = owners;
+        _serviceOrders = serviceOrders;
+        _usersUow = usersUow;
     }
 
     private Guid GetCurrentUserId()
@@ -46,17 +54,16 @@ public class VehiclesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<IEnumerable<VehicleDto>>> GetVehicles()
     {
-        IEnumerable<BllVehicle> vehicles;
+        IEnumerable<Users.Application.DTO.BllVehicle> vehicles;
 
         if (!IsAdmin() && !IsMechanic())
         {
             // Client: IDOR — own vehicles only (empty list if no owner profile yet).
-            // Owner -> AppUser filtering now lives in the repository query.
-            vehicles = await _bll.Vehicles.AllByUserAsync(GetCurrentUserId());
+            vehicles = await _vehicles.AllByUserAsync(GetCurrentUserId());
         }
         else
         {
-            vehicles = await _bll.Vehicles.AllAsync();
+            vehicles = await _vehicles.AllAsync();
         }
 
         var result = vehicles.Select(VehicleApiMapper.ToApiDto).ToList();
@@ -75,16 +82,16 @@ public class VehiclesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<VehicleDto>> GetVehicle(Guid id)
     {
-        BllVehicle? vehicle;
+        Users.Application.DTO.BllVehicle? vehicle;
 
         if (!IsAdmin() && !IsMechanic())
         {
             // Client: IDOR — must be one of the caller's own vehicles.
-            vehicle = await _bll.Vehicles.FindByUserAsync(id, GetCurrentUserId());
+            vehicle = await _vehicles.FindByUserAsync(id, GetCurrentUserId());
         }
         else
         {
-            vehicle = await _bll.Vehicles.FindAsync(id);
+            vehicle = await _vehicles.FindAsync(id);
         }
 
         if (vehicle == null) return NotFound();
@@ -110,11 +117,11 @@ public class VehiclesController : ControllerBase
 
         // EnsureForUserAsync: returns existing Owner, or stages a new one (no intermediate save).
         // EF inserts Owner before Vehicle in the same transaction (FK dependency ordering).
-        var owner = await _bll.Owners.EnsureForUserAsync(
+        var owner = await _owners.EnsureForUserAsync(
             userId, IdentityHelpers.GetUserEmail(User) ?? "Unknown");
 
-        var created = _bll.Vehicles.Add(VehicleApiMapper.ToBll(dto, owner.Id));
-        await _bll.SaveChangesAsync();
+        var created = _vehicles.Add(VehicleApiMapper.ToBll(dto, owner.Id));
+        await _usersUow.SaveChangesAsync();
 
         return CreatedAtAction(nameof(GetVehicle), new { id = created.Id }, VehicleApiMapper.ToApiDto(created));
     }
@@ -134,23 +141,23 @@ public class VehiclesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> UpdateVehicle(Guid id, [FromBody] VehicleCreateDto dto)
     {
-        BllVehicle? vehicle;
+        Users.Application.DTO.BllVehicle? vehicle;
 
         if (!IsAdmin())
         {
             // Client: IDOR — must own the vehicle.
-            vehicle = await _bll.Vehicles.FindByUserAsync(id, GetCurrentUserId());
+            vehicle = await _vehicles.FindByUserAsync(id, GetCurrentUserId());
         }
         else
         {
-            vehicle = await _bll.Vehicles.FindAsync(id);
+            vehicle = await _vehicles.FindAsync(id);
         }
 
         if (vehicle == null) return NotFound();
 
         VehicleApiMapper.ApplyUpdate(vehicle, dto);
-        await _bll.Vehicles.UpdateAsync(vehicle);
-        await _bll.SaveChangesAsync();
+        await _vehicles.UpdateAsync(vehicle);
+        await _usersUow.SaveChangesAsync();
 
         return NoContent();
     }
@@ -169,27 +176,27 @@ public class VehiclesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> DeleteVehicle(Guid id)
     {
-        BllVehicle? vehicle;
+        Users.Application.DTO.BllVehicle? vehicle;
 
         if (!IsAdmin())
         {
-            vehicle = await _bll.Vehicles.FindByUserAsync(id, GetCurrentUserId());
+            vehicle = await _vehicles.FindByUserAsync(id, GetCurrentUserId());
         }
         else
         {
-            vehicle = await _bll.Vehicles.FindAsync(id);
+            vehicle = await _vehicles.FindAsync(id);
         }
 
         if (vehicle == null) return NotFound();
 
-        // Business rule lives in the BLL now (DB-level EXISTS query).
-        if (!await _bll.Vehicles.CanDeleteAsync(id))
+        // Cross-module check: ask the Orders module if this vehicle has any service orders.
+        if (await _serviceOrders.HasOrdersForVehicleAsync(id))
             return BadRequest(new { message = "Cannot delete vehicle with existing service orders." });
 
         try
         {
-            _bll.Vehicles.Remove(vehicle);
-            await _bll.SaveChangesAsync();
+            _vehicles.Remove(vehicle);
+            await _usersUow.SaveChangesAsync();
         }
         catch (DbUpdateException)
         {

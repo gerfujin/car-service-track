@@ -1,10 +1,10 @@
-using App.BLL.DTO;
 using App.DTO.v1.SparePart;
+using Workshops.Application.DTO;
 
 namespace WebApp.Mappers;
 
 /// <summary>
-/// Maps between BllSparePart and the API DTOs. Note the original controller's quirks that are
+/// Maps between Workshops.Application.DTO.BllSparePart and the API DTOs. Note the original controller's quirks
 /// preserved here byte-for-byte:
 ///  - the DTO has no real "Manufacturer" column; it aliases the entity's PartNumber.
 ///  - GET maps BOTH PartNumber and Manufacturer from PartNumber.

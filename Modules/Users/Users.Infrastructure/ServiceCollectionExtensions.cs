@@ -33,6 +33,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAppUserService, AppUserService>();
         services.AddScoped<IOwnerService, OwnerService>();
         services.AddScoped<IVehicleService, VehicleService>();
+        services.AddScoped<IRefreshTokenService, RefreshTokenService>();
 
         return services;
     }

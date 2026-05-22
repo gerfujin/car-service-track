@@ -1,15 +1,29 @@
-using App.DAL.EF;
-using App.Domain;
 using App.Domain.Identity;
 using Base.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
+using Orders.Domain;
+using Orders.Domain.Enums;
+using Orders.Infrastructure;
+using Users.Infrastructure;
+using Workshops.Domain;
+using Workshops.Infrastructure;
 
 namespace CarServiceTrack.Tests.Integration.Fixtures;
 
 /// <summary>
 /// Seeds two independent users (A and B) with full data so that IDOR tests can
 /// verify cross-user isolation. Also seeds reference data (workshop, services).
+///
+/// Identity (users/roles) goes into AppDbContext via UserManager so that
+/// JWT authentication works during tests.  All other domain data goes into
+/// the corresponding module DbContexts (WorkshopsDbContext, UsersDbContext,
+/// OrdersDbContext) that the module Application Services read from.
+///
+/// EF Core SQLite enforces FK constraints (PRAGMA foreign_keys = ON). Because
+/// Owner.AppUserId references the AspNetUsers table *inside UsersDbContext*,
+/// we must mirror the identity users there too, even though the canonical user
+/// lives in AppDbContext.
 /// </summary>
 public class SeedResult
 {
@@ -32,31 +46,33 @@ public static class TestDataSeeder
 
     public static async Task<SeedResult> SeedAsync(IServiceProvider sp)
     {
-        var db = sp.GetRequiredService<AppDbContext>();
+        // ── Identity (AppDbContext) ────────────────────────────────────────────
+        // UserManager / RoleManager are backed by AppDbContext in the test host.
+        // We keep this as-is so that JWT bearer tokens issued by the test helpers
+        // are accepted by the running application.
         var userManager = sp.GetRequiredService<UserManager<AppUser>>();
         var roleManager = sp.GetRequiredService<RoleManager<AppRole>>();
 
-        // ── Roles ─────────────────────────────────────────────────────────────
-        // Lowercase "client" matches InitialData.cs and the API [Authorize] attrs.
         foreach (var role in new[] { "admin", "mechanic", "client" })
         {
             if (!await roleManager.RoleExistsAsync(role))
                 await roleManager.CreateAsync(new AppRole { Name = role });
         }
 
-        // ── Users ─────────────────────────────────────────────────────────────
         var userA = await CreateUserAsync(userManager, "usera@test.com", Password, "client");
         var userB = await CreateUserAsync(userManager, "userb@test.com", Password, "client");
         var admin = await CreateUserAsync(userManager, "admin@test.com", Password, "admin");
 
-        // ── Reference data ────────────────────────────────────────────────────
+        // ── Workshops module ──────────────────────────────────────────────────
+        var workshopsDb = sp.GetRequiredService<WorkshopsDbContext>();
+
         var workshop = new Workshop
         {
             Name = new LangStr("Test Workshop", "en"),
             Address = new LangStr("Test Street 1", "en"),
             Phone = "+372 555 1234"
         };
-        db.Workshops.Add(workshop);
+        workshopsDb.Workshops.Add(workshop);
 
         var service = new Service
         {
@@ -64,13 +80,21 @@ public static class TestDataSeeder
             Description = new LangStr("Full oil change", "en"),
             BasePrice = 49.99m
         };
-        db.Services.Add(service);
+        workshopsDb.Services.Add(service);
 
-        // ── Owner + Vehicle for User A ─────────────────────────────────────────
-        var ownerA = new Owner { AppUserId = userA.Id, FirstName = "Alice", LastName = "A" };
-        db.Owners.Add(ownerA);
+        await workshopsDb.SaveChangesAsync();
 
-        var vehicleA = new Vehicle
+        // ── Users module ──────────────────────────────────────────────────────
+        // FK enforcement is disabled on UsersDbContext's SQLite connection via
+        // DisableForeignKeysInterceptor (see CustomWebApplicationFactory), so we can
+        // insert Owners directly without mirroring users into users.AspNetUsers.
+        var usersDb = sp.GetRequiredService<UsersDbContext>();
+
+        var ownerA = new Users.Domain.Owner { AppUserId = userA.Id, FirstName = "Alice", LastName = "A" };
+        usersDb.Owners.Add(ownerA);
+        await usersDb.SaveChangesAsync();   // flush so ownerA.Id is populated
+
+        var vehicleA = new Users.Domain.Vehicle
         {
             OwnerId = ownerA.Id,
             Make = "Toyota",
@@ -78,13 +102,13 @@ public static class TestDataSeeder
             Year = 2022,
             LicensePlate = "CTA001"
         };
-        db.Vehicles.Add(vehicleA);
+        usersDb.Vehicles.Add(vehicleA);
 
-        // ── Owner + Vehicle for User B ─────────────────────────────────────────
-        var ownerB = new Owner { AppUserId = userB.Id, FirstName = "Bob", LastName = "B" };
-        db.Owners.Add(ownerB);
+        var ownerB = new Users.Domain.Owner { AppUserId = userB.Id, FirstName = "Bob", LastName = "B" };
+        usersDb.Owners.Add(ownerB);
+        await usersDb.SaveChangesAsync();   // flush so ownerB.Id is populated
 
-        var vehicleB = new Vehicle
+        var vehicleB = new Users.Domain.Vehicle
         {
             OwnerId = ownerB.Id,
             Make = "Honda",
@@ -92,35 +116,37 @@ public static class TestDataSeeder
             Year = 2021,
             LicensePlate = "CTB002"
         };
-        db.Vehicles.Add(vehicleB);
+        usersDb.Vehicles.Add(vehicleB);
 
-        await db.SaveChangesAsync();
+        await usersDb.SaveChangesAsync();
 
-        // ── Service Order for User A ──────────────────────────────────────────
+        // ── Orders module ─────────────────────────────────────────────────────
+        // ServiceOrder.VehicleId / WorkshopId are cross-module plain-id references
+        // stored without a FK in the Orders schema — no constraint problem here.
+        var ordersDb = sp.GetRequiredService<OrdersDbContext>();
+
         var orderA = new ServiceOrder
         {
+            AppUserId = userA.Id,
             VehicleId = vehicleA.Id,
             WorkshopId = workshop.Id,
-            Status = App.Domain.Enums.ServiceOrderStatus.Pending,
+            Status = ServiceOrderStatus.Pending,
             OrderDate = DateTime.UtcNow,
             Description = "First service order"
         };
-        db.ServiceOrders.Add(orderA);
+        ordersDb.ServiceOrders.Add(orderA);
+        await ordersDb.SaveChangesAsync();   // flush so orderA.Id is populated
 
-        await db.SaveChangesAsync();
-
-        // ── Payment for User A's order ────────────────────────────────────────
         var paymentA = new Payment
         {
             ServiceOrderId = orderA.Id,
             Amount = 149.99m,
-            Status = App.Domain.Enums.PaymentStatus.Pending,
+            Status = PaymentStatus.Pending,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
-        db.Payments.Add(paymentA);
-
-        await db.SaveChangesAsync();
+        ordersDb.Payments.Add(paymentA);
+        await ordersDb.SaveChangesAsync();
 
         return new SeedResult
         {
@@ -150,7 +176,8 @@ public static class TestDataSeeder
         var user = new AppUser { Email = email, UserName = email, EmailConfirmed = true };
         var result = await userManager.CreateAsync(user, password);
         if (!result.Succeeded)
-            throw new InvalidOperationException($"Failed to create test user {email}: {string.Join(", ", result.Errors.Select(e => e.Description))}");
+            throw new InvalidOperationException(
+                $"Failed to create test user {email}: {string.Join(", ", result.Errors.Select(e => e.Description))}");
 
         await userManager.AddToRoleAsync(user, role);
         return user;

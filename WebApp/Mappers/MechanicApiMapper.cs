@@ -1,5 +1,5 @@
-using App.BLL.DTO;
 using App.DTO.v1.Mechanic;
+using Workshops.Application.DTO;
 
 namespace WebApp.Mappers;
 

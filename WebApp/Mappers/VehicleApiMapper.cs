@@ -1,10 +1,10 @@
-using App.BLL.DTO;
 using App.DTO.v1.Vehicle;
+using Users.Application.DTO;
 
 namespace WebApp.Mappers;
 
 /// <summary>
-/// Maps between the BLL DTO (BllVehicle) and the API DTOs (App.DTO.v1.Vehicle.*).
+/// Maps between the module BLL DTO (Users.Application.DTO.BllVehicle) and the API DTOs (App.DTO.v1.Vehicle.*).
 /// Keeps the controller free of repetitive field-by-field mapping.
 /// </summary>
 public static class VehicleApiMapper

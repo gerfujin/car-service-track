@@ -1,10 +1,11 @@
-using App.BLL;
 using App.DTO.v1;
 using App.DTO.v1.Service;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Workshops.Application.Services;
+using Workshops.Contracts;
 using WebApp.Mappers;
 
 namespace WebApp.ApiControllers;
@@ -15,11 +16,13 @@ namespace WebApp.ApiControllers;
 [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
 public class ServicesController : ControllerBase
 {
-    private readonly IAppBll _bll;
+    private readonly IServiceService _services;
+    private readonly IWorkshopsUnitOfWork _workshopsUow;
 
-    public ServicesController(IAppBll bll)
+    public ServicesController(IServiceService services, IWorkshopsUnitOfWork workshopsUow)
     {
-        _bll = bll;
+        _services = services;
+        _workshopsUow = workshopsUow;
     }
 
     /// <summary>Get all services (public)</summary>
@@ -28,7 +31,7 @@ public class ServicesController : ControllerBase
     [ProducesResponseType<IEnumerable<ServiceDto>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<ServiceDto>>> GetServices()
     {
-        var services = (await _bll.Services.AllAsync())
+        var services = (await _services.AllAsync())
             .Select(ServiceApiMapper.ToApiDto)
             .ToList();
 
@@ -42,7 +45,7 @@ public class ServicesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ServiceDto>> GetService(Guid id)
     {
-        var service = await _bll.Services.FindAsync(id);
+        var service = await _services.FindAsync(id);
         if (service == null)
         {
             return NotFound(new RestApiErrorResponse
@@ -67,8 +70,8 @@ public class ServicesController : ControllerBase
         var validationError = ValidateServiceInput(dto.Name, dto.BasePrice, dto.EstimatedTimeMinutes);
         if (validationError != null) return validationError;
 
-        var created = _bll.Services.Add(ServiceApiMapper.ToBll(dto));
-        await _bll.SaveChangesAsync();
+        var created = _services.Add(ServiceApiMapper.ToBll(dto));
+        await _workshopsUow.SaveChangesAsync();
 
         return CreatedAtAction(nameof(GetService), new { id = created.Id }, ServiceApiMapper.ToApiDto(created));
     }
@@ -84,7 +87,7 @@ public class ServicesController : ControllerBase
         var validationError = ValidateServiceInput(dto.Name, dto.BasePrice, dto.EstimatedTimeMinutes);
         if (validationError != null) return validationError;
 
-        var updated = await _bll.Services.UpdateAsync(ServiceApiMapper.ToBll(dto, id));
+        var updated = await _services.UpdateAsync(ServiceApiMapper.ToBll(dto, id));
         if (updated == null)
         {
             return NotFound(new RestApiErrorResponse
@@ -94,7 +97,7 @@ public class ServicesController : ControllerBase
             });
         }
 
-        await _bll.SaveChangesAsync();
+        await _workshopsUow.SaveChangesAsync();
 
         return NoContent();
     }
@@ -106,7 +109,7 @@ public class ServicesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteService(Guid id)
     {
-        var service = await _bll.Services.FindAsync(id);
+        var service = await _services.FindAsync(id);
         if (service == null)
         {
             return NotFound(new RestApiErrorResponse
@@ -116,8 +119,8 @@ public class ServicesController : ControllerBase
             });
         }
 
-        _bll.Services.Remove(service);
-        await _bll.SaveChangesAsync();
+        _services.Remove(service);
+        await _workshopsUow.SaveChangesAsync();
 
         return NoContent();
     }

@@ -1,4 +1,3 @@
-using App.BLL;
 using App.DTO.v1;
 using App.DTO.v1.ServiceOrderPart;
 using Asp.Versioning;
@@ -6,6 +5,8 @@ using Base.Helpers;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Orders.Application.Services;
+using Orders.Contracts;
 using WebApp.Mappers;
 
 namespace WebApp.ApiControllers;
@@ -16,11 +17,13 @@ namespace WebApp.ApiControllers;
 [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
 public class ServiceOrderPartsController : ControllerBase
 {
-    private readonly IAppBll _bll;
+    private readonly IServiceOrderPartService _serviceOrderParts;
+    private readonly IOrdersUnitOfWork _ordersUow;
 
-    public ServiceOrderPartsController(IAppBll bll)
+    public ServiceOrderPartsController(IServiceOrderPartService serviceOrderParts, IOrdersUnitOfWork ordersUow)
     {
-        _bll = bll;
+        _serviceOrderParts = serviceOrderParts;
+        _ordersUow = ordersUow;
     }
 
     private Guid GetCurrentUserId()
@@ -47,7 +50,7 @@ public class ServiceOrderPartsController : ControllerBase
         var isMechanic = IsMechanic();
         var appUserId = isAdmin || isMechanic ? Guid.Empty : GetCurrentUserId();
 
-        var parts = (await _bll.ServiceOrderParts.AllForApiAsync(serviceOrderId, appUserId, isAdmin, isMechanic))
+        var parts = (await _serviceOrderParts.AllForApiAsync(serviceOrderId, appUserId, isAdmin, isMechanic))
             .Select(ServiceOrderPartApiMapper.ToApiDto)
             .ToList();
 
@@ -63,7 +66,7 @@ public class ServiceOrderPartsController : ControllerBase
         var isMechanic = IsMechanic();
         var appUserId = isAdmin || isMechanic ? Guid.Empty : GetCurrentUserId();
 
-        var sop = await _bll.ServiceOrderParts.FindForApiAsync(id, appUserId, isAdmin, isMechanic);
+        var sop = await _serviceOrderParts.FindForApiAsync(id, appUserId, isAdmin, isMechanic);
 
         if (sop == null) return NotFound();
         return Ok(ServiceOrderPartApiMapper.ToApiDto(sop));
@@ -75,17 +78,17 @@ public class ServiceOrderPartsController : ControllerBase
     [ProducesResponseType<RestApiErrorResponse>(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<ServiceOrderPartDto>> CreateServiceOrderPart([FromBody] ServiceOrderPartCreateDto dto)
     {
-        var result = await _bll.ServiceOrderParts.CreateForApiAsync(ServiceOrderPartApiMapper.ToBll(dto));
+        var result = await _serviceOrderParts.CreateForApiAsync(ServiceOrderPartApiMapper.ToBll(dto));
         if (result.Error != null)
         {
             return BadRequest(ErrorResponse(result.Error));
         }
 
-        await _bll.SaveChangesAsync();
+        await _ordersUow.SaveChangesAsync();
         if (result.RecalculateServiceOrderId.HasValue)
         {
-            await _bll.ServiceOrderParts.RecalculateOrderTotalAsync(result.RecalculateServiceOrderId.Value);
-            await _bll.SaveChangesAsync();
+            await _serviceOrderParts.RecalculateOrderTotalAsync(result.RecalculateServiceOrderId.Value);
+            await _ordersUow.SaveChangesAsync();
         }
 
         return CreatedAtAction(
@@ -101,18 +104,18 @@ public class ServiceOrderPartsController : ControllerBase
     [ProducesResponseType<RestApiErrorResponse>(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> UpdateServiceOrderPart(Guid id, [FromBody] ServiceOrderPartUpdateDto dto)
     {
-        var result = await _bll.ServiceOrderParts.UpdateForApiAsync(id, ServiceOrderPartApiMapper.ToBll(dto, id));
+        var result = await _serviceOrderParts.UpdateForApiAsync(id, ServiceOrderPartApiMapper.ToBll(dto, id));
         if (result.NotFound) return NotFound();
         if (result.Error != null)
         {
             return BadRequest(ErrorResponse(result.Error));
         }
 
-        await _bll.SaveChangesAsync();
+        await _ordersUow.SaveChangesAsync();
         if (result.RecalculateServiceOrderId.HasValue)
         {
-            await _bll.ServiceOrderParts.RecalculateOrderTotalAsync(result.RecalculateServiceOrderId.Value);
-            await _bll.SaveChangesAsync();
+            await _serviceOrderParts.RecalculateOrderTotalAsync(result.RecalculateServiceOrderId.Value);
+            await _ordersUow.SaveChangesAsync();
         }
 
         return NoContent();
@@ -124,14 +127,14 @@ public class ServiceOrderPartsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteServiceOrderPart(Guid id)
     {
-        var result = await _bll.ServiceOrderParts.RemoveForApiAsync(id);
+        var result = await _serviceOrderParts.RemoveForApiAsync(id);
         if (result.NotFound) return NotFound();
 
-        await _bll.SaveChangesAsync();
+        await _ordersUow.SaveChangesAsync();
         if (result.RecalculateServiceOrderId.HasValue)
         {
-            await _bll.ServiceOrderParts.RecalculateOrderTotalAsync(result.RecalculateServiceOrderId.Value);
-            await _bll.SaveChangesAsync();
+            await _serviceOrderParts.RecalculateOrderTotalAsync(result.RecalculateServiceOrderId.Value);
+            await _ordersUow.SaveChangesAsync();
         }
 
         return NoContent();

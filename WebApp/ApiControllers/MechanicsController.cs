@@ -1,7 +1,7 @@
-using App.BLL;
 using App.DTO.v1.Mechanic;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
+using Workshops.Application.Services;
 using WebApp.Mappers;
 
 namespace WebApp.ApiControllers;
@@ -11,11 +11,11 @@ namespace WebApp.ApiControllers;
 [Route("/api/v{version:apiVersion}/[controller]")]
 public class MechanicsController : ControllerBase
 {
-    private readonly IAppBll _bll;
+    private readonly IMechanicService _mechanics;
 
-    public MechanicsController(IAppBll bll)
+    public MechanicsController(IMechanicService mechanics)
     {
-        _bll = bll;
+        _mechanics = mechanics;
     }
 
     /// <summary>Get all mechanics (public)</summary>
@@ -24,7 +24,7 @@ public class MechanicsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<MechanicDto>>> GetMechanics()
     {
-        var mechanics = (await _bll.Mechanics.AllAsync())
+        var mechanics = (await _mechanics.AllAsync())
             .Select(MechanicApiMapper.ToApiDto)
             .ToList();
 
@@ -38,7 +38,7 @@ public class MechanicsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<MechanicDto>> GetMechanic(Guid id)
     {
-        var mechanic = await _bll.Mechanics.FindAsync(id);
+        var mechanic = await _mechanics.FindAsync(id);
 
         if (mechanic == null) return NotFound();
         return Ok(MechanicApiMapper.ToApiDto(mechanic));

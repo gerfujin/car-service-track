@@ -1,5 +1,3 @@
-using App.BLL;
-using App.BLL.DTO;
 using App.Domain.Enums;
 using App.DTO.v1;
 using App.DTO.v1.ServiceOrder;
@@ -8,6 +6,11 @@ using Base.Helpers;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Orders.Application.DTO;
+using Orders.Application.Services;
+using Orders.Contracts;
+using Users.Application.Services;
+using Workshops.Application.Services;
 using WebApp.Mappers;
 
 namespace WebApp.ApiControllers;
@@ -18,11 +21,27 @@ namespace WebApp.ApiControllers;
 [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
 public class ServiceOrdersController : ControllerBase
 {
-    private readonly IAppBll _bll;
+    private readonly IServiceOrderService _serviceOrders;
+    private readonly IStatusHistoryService _statusHistories;
+    private readonly IVehicleService _vehicles;
+    private readonly IOwnerService _owners;
+    private readonly IWorkshopService _workshops;
+    private readonly IOrdersUnitOfWork _ordersUow;
 
-    public ServiceOrdersController(IAppBll bll)
+    public ServiceOrdersController(
+        IServiceOrderService serviceOrders,
+        IStatusHistoryService statusHistories,
+        IVehicleService vehicles,
+        IOwnerService owners,
+        IWorkshopService workshops,
+        IOrdersUnitOfWork ordersUow)
     {
-        _bll = bll;
+        _serviceOrders = serviceOrders;
+        _statusHistories = statusHistories;
+        _vehicles = vehicles;
+        _owners = owners;
+        _workshops = workshops;
+        _ordersUow = ordersUow;
     }
 
     private Guid GetCurrentUserId()
@@ -51,11 +70,11 @@ public class ServiceOrdersController : ControllerBase
         {
             // Client: IDOR — own orders only (empty if no owner profile). Owner -> AppUser
             // filtering lives in the repository query.
-            orders = await _bll.ServiceOrders.AllByUserAsync(GetCurrentUserId());
+            orders = await _serviceOrders.AllByUserAsync(GetCurrentUserId());
         }
         else
         {
-            orders = await _bll.ServiceOrders.AllWithDetailsAsync();
+            orders = await _serviceOrders.AllWithDetailsAsync();
         }
 
         var result = orders.Select(ServiceOrderApiMapper.ToApiSummaryDto).ToList();
@@ -73,7 +92,7 @@ public class ServiceOrdersController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ServiceOrderDto>> GetServiceOrder(Guid id)
     {
-        var order = await _bll.ServiceOrders.FindWithDetailsAsync(id);
+        var order = await _serviceOrders.FindWithDetailsAsync(id);
         if (order == null) return NotFound();
 
         if (!IsAdmin() && !IsMechanic() && order.OwnerAppUserId != GetCurrentUserId())
@@ -102,11 +121,11 @@ public class ServiceOrdersController : ControllerBase
     {
         var userId = GetCurrentUserId();
 
-        BllVehicle? vehicle;
+        Users.Application.DTO.BllVehicle? vehicle;
         if (IsAdmin())
         {
-            // Admin can create for any vehicle (vehicle fetched via the BLL).
-            vehicle = await _bll.Vehicles.FindAsync(dto.VehicleId);
+            // Admin can create for any vehicle.
+            vehicle = await _vehicles.FindAsync(dto.VehicleId);
             if (vehicle == null)
             {
                 return BadRequest(new RestApiErrorResponse
@@ -119,7 +138,7 @@ public class ServiceOrdersController : ControllerBase
         else
         {
             // Client: IDOR. Keep the two distinct error messages byte-for-byte.
-            var owner = await _bll.Owners.FindByUserAsync(userId);
+            var owner = await _owners.FindByUserAsync(userId);
             if (owner == null)
             {
                 return BadRequest(new RestApiErrorResponse
@@ -129,7 +148,7 @@ public class ServiceOrdersController : ControllerBase
                 });
             }
 
-            vehicle = (await _bll.Vehicles.AllByUserAsync(userId))
+            vehicle = (await _vehicles.AllByUserAsync(userId))
                 .FirstOrDefault(v => v.Id == dto.VehicleId);
             if (vehicle == null)
             {
@@ -141,8 +160,8 @@ public class ServiceOrdersController : ControllerBase
             }
         }
 
-        // Workshop existence validation via the BLL (Workshops module migrated).
-        var workshop = await _bll.Workshops.FindAsync(dto.WorkshopId);
+        // Workshop existence validation.
+        var workshop = await _workshops.FindAsync(dto.WorkshopId);
         if (workshop == null)
         {
             return BadRequest(new RestApiErrorResponse
@@ -156,26 +175,26 @@ public class ServiceOrdersController : ControllerBase
 
         // AddWithItemsAsync stages the ServiceOrder and then looks up each Service by id
         // to stage properly-priced ServiceOrderItems (Quantity=1, UnitPrice=Service.BasePrice).
-        var created = await _bll.ServiceOrders.AddWithItemsAsync(new BllServiceOrder
+        var created = await _serviceOrders.AddWithItemsAsync(new BllServiceOrder
         {
             Description = dto.Description,
             VehicleId = dto.VehicleId,
             WorkshopId = dto.WorkshopId,
-            Status = ServiceOrderStatus.Pending,
+            Status = Orders.Domain.Enums.ServiceOrderStatus.Pending,
             OrderDate = orderDate,
             ServiceIds = dto.ServiceIds ?? new List<Guid>()
         });
         var orderId = created.Id;
 
-        _bll.StatusHistories.Add(new BllStatusHistory
+        _statusHistories.Add(new BllStatusHistory
         {
             ServiceOrderId = orderId,
-            Status = ServiceOrderStatus.Pending,
+            Status = Orders.Domain.Enums.ServiceOrderStatus.Pending,
             Notes = "Order created",
             ChangedAt = orderDate
         });
 
-        await _bll.SaveChangesAsync();
+        await _ordersUow.SaveChangesAsync();
 
         // Minimal response — byte-for-byte with the old create (TotalAmount 0, no Services).
         var result = new ServiceOrderDto
@@ -187,7 +206,7 @@ public class ServiceOrdersController : ControllerBase
             VehicleId = dto.VehicleId,
             VehicleDisplay = $"{vehicle.Make} {vehicle.Model} ({vehicle.LicensePlate})",
             WorkshopId = dto.WorkshopId,
-            WorkshopName = workshop.Name, // BllWorkshop.Name is already the LangStr.ToString() value
+            WorkshopName = workshop.Name,
             TotalAmount = 0
         };
 
@@ -209,8 +228,11 @@ public class ServiceOrdersController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> UpdateOrderStatus(Guid id, [FromBody] UpdateOrderStatusDto dto)
     {
-        if (!await _bll.ServiceOrders.SetStatusAsync(id, dto.Status, dto.Notes)) return NotFound();
-        await _bll.SaveChangesAsync();
+        // Cast App.Domain.Enums.ServiceOrderStatus → Orders.Domain.Enums.ServiceOrderStatus
+        // (both enums share identical numeric values 0–5).
+        var moduleStatus = (Orders.Domain.Enums.ServiceOrderStatus)(int)dto.Status;
+        if (!await _serviceOrders.SetStatusAsync(id, moduleStatus, dto.Notes)) return NotFound();
+        await _ordersUow.SaveChangesAsync();
         return NoContent();
     }
 
@@ -227,14 +249,14 @@ public class ServiceOrdersController : ControllerBase
     {
         if (!IsAdmin() && !IsMechanic())
         {
-            if (!await _bll.ServiceOrders.IsOwnedByUserAsync(id, GetCurrentUserId())) return NotFound();
+            if (!await _serviceOrders.IsOwnedByUserAsync(id, GetCurrentUserId())) return NotFound();
         }
         else
         {
-            if (!await _bll.ServiceOrders.ExistsAsync(id)) return NotFound();
+            if (!await _serviceOrders.ExistsAsync(id)) return NotFound();
         }
 
-        var history = (await _bll.StatusHistories.AllByOrderAsync(id))
+        var history = (await _statusHistories.AllByOrderAsync(id))
             .Select(h => new
             {
                 h.Id,

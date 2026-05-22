@@ -1,6 +1,3 @@
-using App.BLL;
-using App.BLL.DTO;
-using App.Domain.Enums;
 using App.DTO.v1;
 using App.DTO.v1.Payment;
 using Asp.Versioning;
@@ -8,6 +5,9 @@ using Base.Helpers;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Orders.Application.Services;
+using Orders.Contracts;
+using Orders.Domain.Enums;
 using WebApp.Mappers;
 
 namespace WebApp.ApiControllers;
@@ -18,11 +18,13 @@ namespace WebApp.ApiControllers;
 [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
 public class PaymentsController : ControllerBase
 {
-    private readonly IAppBll _bll;
+    private readonly IPaymentService _payments;
+    private readonly IOrdersUnitOfWork _ordersUow;
 
-    public PaymentsController(IAppBll bll)
+    public PaymentsController(IPaymentService payments, IOrdersUnitOfWork ordersUow)
     {
-        _bll = bll;
+        _payments = payments;
+        _ordersUow = ordersUow;
     }
 
     private Guid GetCurrentUserId()
@@ -46,15 +48,15 @@ public class PaymentsController : ControllerBase
     [ProducesResponseType<IEnumerable<PaymentDto>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<PaymentDto>>> GetPayments([FromQuery] Guid? serviceOrderId = null)
     {
-        IEnumerable<BllPayment> payments;
+        IEnumerable<Orders.Application.DTO.BllPayment> payments;
         if (!IsAdmin() && !IsMechanic())
         {
             // Client: IDOR — own payments only. Empty list returned when no owner profile exists.
-            payments = await _bll.Payments.AllByUserAsync(GetCurrentUserId(), serviceOrderId);
+            payments = await _payments.AllByUserAsync(GetCurrentUserId(), serviceOrderId);
         }
         else
         {
-            payments = await _bll.Payments.AllWithDetailsAsync(serviceOrderId);
+            payments = await _payments.AllWithDetailsAsync(serviceOrderId);
         }
         return Ok(payments.Select(PaymentApiMapper.ToApiDto).ToList());
     }
@@ -70,14 +72,14 @@ public class PaymentsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<PaymentDto>> GetPayment(Guid id)
     {
-        BllPayment? payment;
+        Orders.Application.DTO.BllPayment? payment;
         if (!IsAdmin() && !IsMechanic())
         {
-            payment = await _bll.Payments.FindWithDetailsForUserAsync(id, GetCurrentUserId());
+            payment = await _payments.FindWithDetailsForUserAsync(id, GetCurrentUserId());
         }
         else
         {
-            payment = await _bll.Payments.FindWithDetailsAsync(id);
+            payment = await _payments.FindWithDetailsAsync(id);
         }
         if (payment == null) return NotFound();
         return Ok(PaymentApiMapper.ToApiDto(payment));
@@ -94,14 +96,14 @@ public class PaymentsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<PaymentDto>> GetPaymentByOrder(Guid serviceOrderId)
     {
-        BllPayment? payment;
+        Orders.Application.DTO.BllPayment? payment;
         if (!IsAdmin() && !IsMechanic())
         {
-            payment = await _bll.Payments.FindByServiceOrderForUserAsync(serviceOrderId, GetCurrentUserId());
+            payment = await _payments.FindByServiceOrderForUserAsync(serviceOrderId, GetCurrentUserId());
         }
         else
         {
-            payment = await _bll.Payments.FindByServiceOrderAsync(serviceOrderId);
+            payment = await _payments.FindByServiceOrderAsync(serviceOrderId);
         }
         if (payment == null) return NotFound();
         return Ok(PaymentApiMapper.ToApiDto(payment));
@@ -119,7 +121,7 @@ public class PaymentsController : ControllerBase
     [ProducesResponseType<RestApiErrorResponse>(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<PaymentDto>> CreatePayment([FromBody] PaymentCreateDto dto)
     {
-        var (bllPayment, error) = await _bll.Payments.CreateForServiceOrderAsync(dto.ServiceOrderId, dto.Amount);
+        var (bllPayment, error) = await _payments.CreateForServiceOrderAsync(dto.ServiceOrderId, dto.Amount);
         if (error != null)
         {
             return BadRequest(new RestApiErrorResponse
@@ -128,7 +130,7 @@ public class PaymentsController : ControllerBase
                 Error = error
             });
         }
-        await _bll.SaveChangesAsync();
+        await _ordersUow.SaveChangesAsync();
         return CreatedAtAction(nameof(GetPayment), new { id = bllPayment!.Id }, PaymentApiMapper.ToApiDto(bllPayment));
     }
 
@@ -144,7 +146,7 @@ public class PaymentsController : ControllerBase
     [ProducesResponseType<RestApiErrorResponse>(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> PayInvoice(Guid id)
     {
-        var payment = await _bll.Payments.FindWithDetailsForUserAsync(id, GetCurrentUserId());
+        var payment = await _payments.FindWithDetailsForUserAsync(id, GetCurrentUserId());
         if (payment == null) return NotFound();
 
         if (payment.Status != PaymentStatus.Pending)
@@ -156,8 +158,8 @@ public class PaymentsController : ControllerBase
             });
         }
 
-        await _bll.Payments.MarkAsPaidAsync(payment.Id);
-        await _bll.SaveChangesAsync();
+        await _payments.MarkAsPaidAsync(payment.Id);
+        await _ordersUow.SaveChangesAsync();
         return NoContent();
     }
 }
