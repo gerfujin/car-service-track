@@ -177,6 +177,8 @@ public class ServiceOrdersController : ControllerBase
         // to stage properly-priced ServiceOrderItems (Quantity=1, UnitPrice=Service.BasePrice).
         var created = await _serviceOrders.AddWithItemsAsync(new BllServiceOrder
         {
+            // BUGFIX: AppUserId claim extraction
+            AppUserId = userId,
             Description = dto.Description,
             VehicleId = dto.VehicleId,
             WorkshopId = dto.WorkshopId,
