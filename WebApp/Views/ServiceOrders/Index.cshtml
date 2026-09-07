@@ -1,6 +1,6 @@
 @using Microsoft.Extensions.Localization
 @inject IStringLocalizer<App.Resources.Views.CarService> Localizer
-@model WebApp.ViewModels.Client.ServiceOrderClientListViewModel
+@model Orders.Presentation.ViewModels.Client.ServiceOrderClientListViewModel
 @{
     ViewData["Title"] = Localizer["Orders"];
     var canUpdateStatus = Model.CanUpdateStatus;

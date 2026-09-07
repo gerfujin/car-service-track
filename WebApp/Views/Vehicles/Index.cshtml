@@ -1,6 +1,6 @@
 @using Microsoft.Extensions.Localization
 @inject IStringLocalizer<App.Resources.Views.CarService> Localizer
-@model WebApp.ViewModels.Client.VehicleListClientViewModel
+@model Users.Presentation.ViewModels.Client.VehicleListClientViewModel
 @{
     ViewData["Title"] = Localizer["Vehicles"];
     var isReadOnly = ViewBag.IsReadOnly == true;

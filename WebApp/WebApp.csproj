@@ -24,19 +24,21 @@
     </ItemGroup>
 
     <ItemGroup>
-      <!-- Module composition root: host wires Infrastructure for each module -->
+      <!-- Module composition root: host wires Infrastructure and Presentation for each module -->
       <ProjectReference Include="..\Modules\Users\Users.Infrastructure\Users.Infrastructure.csproj" />
       <ProjectReference Include="..\Modules\Workshops\Workshops.Infrastructure\Workshops.Infrastructure.csproj" />
       <ProjectReference Include="..\Modules\Orders\Orders.Infrastructure\Orders.Infrastructure.csproj" />
+      <ProjectReference Include="..\Modules\Users\Users.Presentation\Users.Presentation.csproj" />
+      <ProjectReference Include="..\Modules\Workshops\Workshops.Presentation\Workshops.Presentation.csproj" />
+      <ProjectReference Include="..\Modules\Orders\Orders.Presentation\Orders.Presentation.csproj" />
       <ProjectReference Include="..\Base.Helpers\Base.Helpers.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-      <Compile Include="..\App.DTO\v1\**\*.cs" LinkBase="App.DTO\v1" />
+      <ProjectReference Include="..\App.DTO\App.DTO.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-      <Compile Remove="Controllers\ListItemsController.cs" />
       <_ContentIncludedByDefault Remove="Views\Companies\Create.cshtml" />
       <_ContentIncludedByDefault Remove="Views\Companies\Delete.cshtml" />
       <_ContentIncludedByDefault Remove="Views\Companies\Details.cshtml" />

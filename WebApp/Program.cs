@@ -2,6 +2,8 @@ using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
 using Orders.Infrastructure;
 using Users.Infrastructure;
 using Users.Domain.Identity;
@@ -48,7 +50,7 @@ builder.Services
     .AddCookie(options => { options.SlidingExpiration = true; })
     .AddJwtBearer(cfg =>
     {
-        cfg.RequireHttpsMetadata = true; // TODO: set to true in production!
+        cfg.RequireHttpsMetadata = builder.Configuration.GetValue("JWT:RequireHttpsMetadata", true);
         cfg.SaveToken = true;
         cfg.TokenValidationParameters = new TokenValidationParameters
         {
@@ -87,6 +89,22 @@ builder.Services.Configure<RequestLocalizationOptions>(options =>
         new QueryStringRequestCultureProvider(),
         new CookieRequestCultureProvider()
     };
+});
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    // Partitioned per client IP so one caller can't exhaust the window for everyone else.
+    options.AddPolicy("auth", context =>
+    {
+        var ip = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        return RateLimitPartition.GetFixedWindowLimiter(ip, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 5,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0
+        });
+    });
 });
 
 builder.Services.AddCors(options =>
@@ -148,6 +166,10 @@ builder.Services.AddSwaggerGen(c =>
 builder.Services.AddLocalization(options => options.ResourcesPath = "");
 
 builder.Services.AddControllersWithViews()
+    // Modular monolith: controllers live in each module's Presentation assembly.
+    .AddApplicationPart(typeof(Users.Presentation.ApiControllers.ProfileController).Assembly)
+    .AddApplicationPart(typeof(Workshops.Presentation.ApiControllers.MechanicsController).Assembly)
+    .AddApplicationPart(typeof(Orders.Presentation.ApiControllers.PaymentsController).Assembly)
     .AddViewLocalization()
     .AddDataAnnotationsLocalization()
     .AddJsonOptions(opts =>
@@ -170,6 +192,15 @@ else
     app.UseExceptionHandler("/Home/Error");
     // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
+
+    // Baseline security response headers.
+    app.Use(async (context, next) =>
+    {
+        context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
+        context.Response.Headers.Append("X-Frame-Options", "DENY");
+        context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
+        await next();
+    });
 }
 
 app.UseHttpsRedirection();
@@ -180,6 +211,8 @@ app.UseRequestLocalization(options: app.Services
 app.UseCors("CorsAllowAll");
 
 app.UseRouting();
+
+app.UseRateLimiter();
 
 app.UseStaticFiles(); // Required to serve files from wwwroot (e.g. /uploads/repair-photos/)
 
