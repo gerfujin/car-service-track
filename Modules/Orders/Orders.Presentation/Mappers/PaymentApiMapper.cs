@@ -1,7 +1,7 @@
 using App.DTO.v1.Payment;
 using Orders.Application.DTO;
 
-namespace WebApp.Mappers;
+namespace Orders.Presentation.Mappers;
 
 /// <summary>
 /// Maps Orders.Application.DTO.BllPayment to the API DTO (PaymentDto).

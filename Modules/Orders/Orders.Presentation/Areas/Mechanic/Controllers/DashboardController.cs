@@ -2,9 +2,9 @@ using Base.Helpers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Orders.Application.Services;
-using WebApp.Areas.Mechanic.ViewModels;
+using Orders.Presentation.Areas.Mechanic.ViewModels;
 
-namespace WebApp.Areas.Mechanic.Controllers;
+namespace Orders.Presentation.Areas.Mechanic.Controllers;
 
 [Area("Mechanic")]
 [Authorize(Roles = "mechanic")]

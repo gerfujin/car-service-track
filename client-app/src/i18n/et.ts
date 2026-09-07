@@ -186,5 +186,17 @@ export default {
     confirm: 'Kinnita',
     yes: 'Jah',
     no: 'Ei'
+  },
+  profile: {
+    title: 'Minu profiil',
+    email: 'E-post',
+    firstName: 'Eesnimi',
+    lastName: 'Perekonnanimi',
+    address: 'Aadress',
+    phone: 'Telefon',
+    save: 'Salvesta muudatused',
+    updateSuccess: 'Profiil edukalt uuendatud.',
+    errorLoad: 'Profiili laadimine ebaõnnestus.',
+    errorSave: 'Profiili uuendamine ebaõnnestus.'
   }
 }

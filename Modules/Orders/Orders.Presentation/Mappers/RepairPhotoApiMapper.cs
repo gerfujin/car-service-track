@@ -1,7 +1,7 @@
 using App.DTO.v1.RepairPhoto;
 using Orders.Application.DTO;
 
-namespace WebApp.Mappers;
+namespace Orders.Presentation.Mappers;
 
 public static class RepairPhotoApiMapper
 {

@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace WebApp.Areas.Admin.ViewModels;
+namespace Workshops.Presentation.Areas.Admin.ViewModels;
 
 public class SparePartAdminViewModel : AdminPageViewModelBase
 {

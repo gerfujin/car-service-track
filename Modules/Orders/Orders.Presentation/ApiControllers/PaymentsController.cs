@@ -8,9 +8,9 @@ using Microsoft.AspNetCore.Mvc;
 using Orders.Application.Services;
 using Orders.Contracts;
 using Orders.Domain.Enums;
-using WebApp.Mappers;
+using Orders.Presentation.Mappers;
 
-namespace WebApp.ApiControllers;
+namespace Orders.Presentation.ApiControllers;
 
 [ApiVersion("1.0")]
 [ApiController]

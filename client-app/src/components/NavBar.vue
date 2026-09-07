@@ -61,12 +61,12 @@
             </li>
           </template>
 
-          <!-- Authenticated: show user email + logout -->
+          <!-- Authenticated: show user name (link to profile) + logout -->
           <template v-else>
             <li class="nav-item">
-              <span class="navbar-text text-light me-xl-2 user-email">
+              <router-link class="nav-link text-light me-xl-2 user-name" to="/profile">
                 👤 {{ authStore.displayName }}
-              </span>
+              </router-link>
             </li>
             <li class="nav-item">
               <button class="btn btn-outline-danger btn-sm" @click="handleLogout">
@@ -122,7 +122,7 @@ async function handleLogout() {
 .app-navbar .nav-link,
 .app-navbar .navbar-brand,
 .app-navbar .btn,
-.app-navbar .user-email,
+.app-navbar .user-name,
 .app-navbar .language-select {
   white-space: nowrap;
 }

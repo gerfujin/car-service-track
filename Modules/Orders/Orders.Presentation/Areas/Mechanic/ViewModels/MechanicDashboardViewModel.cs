@@ -1,4 +1,4 @@
-namespace WebApp.Areas.Mechanic.ViewModels;
+namespace Orders.Presentation.Areas.Mechanic.ViewModels;
 
 public class MechanicDashboardViewModel
 {

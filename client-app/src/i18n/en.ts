@@ -186,5 +186,17 @@ export default {
     confirm: 'Confirm',
     yes: 'Yes',
     no: 'No'
+  },
+  profile: {
+    title: 'My Profile',
+    email: 'Email',
+    firstName: 'First Name',
+    lastName: 'Last Name',
+    address: 'Address',
+    phone: 'Phone',
+    save: 'Save Changes',
+    updateSuccess: 'Profile updated successfully.',
+    errorLoad: 'Failed to load profile.',
+    errorSave: 'Failed to update profile.'
   }
 }

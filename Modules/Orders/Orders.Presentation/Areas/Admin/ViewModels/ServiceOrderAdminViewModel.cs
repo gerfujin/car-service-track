@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using Orders.Domain.Enums;
 using Microsoft.AspNetCore.Mvc.Rendering;
 
-namespace WebApp.Areas.Admin.ViewModels;
+namespace Orders.Presentation.Areas.Admin.ViewModels;
 
 public class ServiceOrderAdminViewModel
 {

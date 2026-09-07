@@ -1,6 +1,6 @@
 using Orders.Domain.Enums;
 
-namespace WebApp.ViewModels.Client;
+namespace Orders.Presentation.ViewModels.Client;
 
 public class PaymentClientViewModel
 {

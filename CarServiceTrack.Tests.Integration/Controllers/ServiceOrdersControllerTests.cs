@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using App.DTO.v1;
 using App.DTO.v1.ServiceOrder;
 using CarServiceTrack.Tests.Integration.Fixtures;
 using CarServiceTrack.Tests.Integration.Helpers;
@@ -137,6 +138,27 @@ public class ServiceOrdersControllerTests : IAsyncLifetime
         var response = await _client.PostAsJsonAsync("/api/v1/serviceorders", dto);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task CreateServiceOrder_AsClientWithNoOwnerProfile_Returns400()
+    {
+        // Client identity that was never seeded with an Owner row — GetOwnerByAppUserIdQuery
+        // must return null, hitting the distinct "Owner profile not found" branch (as opposed
+        // to the "vehicle not found or not owned" branch covered by the WithUserBVehicle test).
+        var userWithNoOwnerId = Guid.NewGuid();
+        SetBearerToken(TestJwtHelper.ClientBearer(userWithNoOwnerId, "noowner@test.com"));
+        var dto = new ServiceOrderCreateDto
+        {
+            VehicleId = _seed.UserAVehicleId,
+            WorkshopId = _seed.WorkshopId
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/v1/serviceorders", dto);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var error = await response.Content.ReadFromJsonAsync<RestApiErrorResponse>(TestJson.Options);
+        error!.Error.Should().Be("Owner profile not found. Please create a vehicle first.");
     }
 
     [Fact]

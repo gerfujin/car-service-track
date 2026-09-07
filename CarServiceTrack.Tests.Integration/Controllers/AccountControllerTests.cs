@@ -1,5 +1,7 @@
+using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Net.Http.Json;
+using System.Security.Claims;
 using App.DTO.v1.Identity;
 using CarServiceTrack.Tests.Integration.Fixtures;
 using FluentAssertions;
@@ -54,6 +56,20 @@ public class AccountControllerTests : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
+    [Fact]
+    public async Task Register_WithFirstAndLastName_IssuesJwtCarryingNameClaims()
+    {
+        var dto = new RegisterInfo
+            { Email = "newuser2@test.com", Password = "Test123!", Firstname = "New", Lastname = "Person" };
+
+        var response = await _client.PostAsJsonAsync("/api/v1/identity/account/register", dto);
+        var body = await response.Content.ReadFromJsonAsync<JWTResponse>();
+
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(body!.Jwt);
+        jwt.Claims.First(c => c.Type == ClaimTypes.GivenName).Value.Should().Be("New");
+        jwt.Claims.First(c => c.Type == ClaimTypes.Surname).Value.Should().Be("Person");
+    }
+
     // ── Login ─────────────────────────────────────────────────────────────────
     [Fact]
     public async Task Login_WithValidCredentials_Returns200WithJwtAndRefreshToken()
@@ -66,6 +82,19 @@ public class AccountControllerTests : IAsyncLifetime
         var body = await response.Content.ReadFromJsonAsync<JWTResponse>();
         body!.Jwt.Should().NotBeNullOrWhiteSpace();
         body.RefreshToken.Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public async Task Login_ForSeededOwner_IssuesJwtCarryingNameClaims()
+    {
+        var dto = new LoginInfo { Email = _seed.UserAEmail, Password = "Test123!" };
+
+        var response = await _client.PostAsJsonAsync("/api/v1/identity/account/login", dto);
+        var body = await response.Content.ReadFromJsonAsync<JWTResponse>();
+
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(body!.Jwt);
+        jwt.Claims.First(c => c.Type == ClaimTypes.GivenName).Value.Should().Be("Alice");
+        jwt.Claims.First(c => c.Type == ClaimTypes.Surname).Value.Should().Be("A");
     }
 
     [Fact]

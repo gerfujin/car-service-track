@@ -1,7 +1,7 @@
 using App.DTO.v1.SparePart;
 using Workshops.Application.DTO;
 
-namespace WebApp.Mappers;
+namespace Workshops.Presentation.Mappers;
 
 /// <summary>
 /// Maps between Workshops.Application.DTO.BllSparePart and the API DTOs. Note the original controller's quirks

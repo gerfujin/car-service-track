@@ -1,9 +1,11 @@
 using App.DTO.v1;
 using App.DTO.v1.Identity;
 using Base.Helpers;
+using Users.Application.DTO;
 using Users.Application.Services;
+using Users.Contracts;
 
-namespace WebApp.ApiControllers.Identity;
+namespace Users.Presentation.ApiControllers.Identity;
 
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
@@ -13,6 +15,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Users.Domain.Identity;
 
 [ApiVersion("1.0")]
@@ -27,10 +30,13 @@ public class AccountController : ControllerBase
     private readonly SignInManager<AppUser> _signInManager;
     private readonly IConfiguration _configuration;
     private readonly IRefreshTokenService _refreshTokens;
+    private readonly IOwnerService _owners;
+    private readonly IUsersUnitOfWork _usersUow;
 
     public AccountController(UserManager<AppUser> userManager, ILogger<AccountController> logger,
         SignInManager<AppUser> signInManager, IConfiguration configuration,
-        RoleManager<AppRole> roleManager, IRefreshTokenService refreshTokens)
+        RoleManager<AppRole> roleManager, IRefreshTokenService refreshTokens,
+        IOwnerService owners, IUsersUnitOfWork usersUow)
     {
         _userManager = userManager;
         _roleManager = roleManager;
@@ -38,6 +44,27 @@ public class AccountController : ControllerBase
         _signInManager = signInManager;
         _configuration = configuration;
         _refreshTokens = refreshTokens;
+        _owners = owners;
+        _usersUow = usersUow;
+    }
+
+    /// <summary>
+    /// Builds the standard Identity claims principal for a user and, if the user already has
+    /// an Owner profile, adds GivenName/Surname claims so the display name reaches the frontend
+    /// via the same JWT mechanism the email already uses.
+    /// </summary>
+    private async Task<ClaimsPrincipal> CreatePrincipalWithProfileClaimsAsync(AppUser appUser)
+    {
+        var claimsPrincipal = await _signInManager.CreateUserPrincipalAsync(appUser);
+
+        var owner = await _owners.FindByUserAsync(appUser.Id);
+        if (owner != null && claimsPrincipal.Identity is ClaimsIdentity identity)
+        {
+            identity.AddClaim(new Claim(ClaimTypes.GivenName, owner.FirstName));
+            identity.AddClaim(new Claim(ClaimTypes.Surname, owner.LastName));
+        }
+
+        return claimsPrincipal;
     }
 
 
@@ -48,6 +75,7 @@ public class AccountController : ControllerBase
     /// <param name="expiresInSeconds">Override jwt lifetime for testing.</param>
     /// <returns>JWTResponse - jwt and refresh token</returns>
     [HttpPost]
+    [EnableRateLimiting("auth")]
     [Produces("application/json")]
     [Consumes("application/json")]
     [ProducesResponseType<JWTResponse>((int) HttpStatusCode.OK)]
@@ -133,7 +161,17 @@ public class AccountController : ControllerBase
         var refreshTokenStr = await _refreshTokens.AddForUserAsync(appUser.Id);
         await _refreshTokens.SaveChangesAsync();
 
-        var claimsPrincipal = await _signInManager.CreateUserPrincipalAsync(appUser);
+        // Persist the display name collected at registration (Owner is the Users-module home
+        // for FirstName/LastName — AppUser/Identity has no name fields).
+        _owners.Add(new BllOwner
+        {
+            AppUserId = appUser.Id,
+            FirstName = registrationData.Firstname,
+            LastName = registrationData.Lastname,
+        });
+        await _usersUow.SaveChangesAsync();
+
+        var claimsPrincipal = await CreatePrincipalWithProfileClaimsAsync(appUser);
         var jwt = IdentityHelpers.GenerateJwt(
             claimsPrincipal.Claims,
             _configuration.GetValue<string>("JWT:Key")!,
@@ -175,6 +213,7 @@ public class AccountController : ControllerBase
 
 
     [HttpPost]
+    [EnableRateLimiting("auth")]
     public async Task<ActionResult<JWTResponse>> Login(
         [FromBody]
         LoginInfo loginInfo,
@@ -206,7 +245,7 @@ public class AccountController : ControllerBase
             return NotFound("User/Password problem");
         }
 
-        var claimsPrincipal = await _signInManager.CreateUserPrincipalAsync(appUser);
+        var claimsPrincipal = await CreatePrincipalWithProfileClaimsAsync(appUser);
 
         // clean up expired refresh tokens (module schema)
         var deletedRows = await _refreshTokens.RemoveExpiredForUserAsync(appUser.Id);
@@ -325,7 +364,7 @@ public class AccountController : ControllerBase
 
 
         // get claims based user
-        var claimsPrincipal = await _signInManager.CreateUserPrincipalAsync(appUser);
+        var claimsPrincipal = await CreatePrincipalWithProfileClaimsAsync(appUser);
 
         // generate jwt
         var jwtResponseStr = IdentityHelpers.GenerateJwt(

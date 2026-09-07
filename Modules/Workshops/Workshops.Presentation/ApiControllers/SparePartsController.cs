@@ -6,9 +6,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Workshops.Application.Services;
 using Workshops.Contracts;
-using WebApp.Mappers;
+using Workshops.Presentation.Mappers;
 
-namespace WebApp.ApiControllers;
+namespace Workshops.Presentation.ApiControllers;
 
 [ApiVersion("1.0")]
 [ApiController]

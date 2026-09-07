@@ -1,6 +1,6 @@
 using Orders.Domain.Enums;
 
-namespace WebApp.Areas.Mechanic.ViewModels;
+namespace Orders.Presentation.Areas.Mechanic.ViewModels;
 
 public class MechanicOrderViewModel
 {

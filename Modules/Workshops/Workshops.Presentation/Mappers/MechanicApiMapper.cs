@@ -1,7 +1,7 @@
 using App.DTO.v1.Mechanic;
 using Workshops.Application.DTO;
 
-namespace WebApp.Mappers;
+namespace Workshops.Presentation.Mappers;
 
 public static class MechanicApiMapper
 {

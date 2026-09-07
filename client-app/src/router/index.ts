@@ -106,6 +106,13 @@ const router = createRouter({
       component: () => import('@/views/AdminSparePartsView.vue'),
       meta: { requiresAuth: true, roles: ['admin'] }
     },
+    // Profile — the authenticated user's own profile
+    {
+      path: '/profile',
+      name: 'profile',
+      component: () => import('@/views/ProfileView.vue'),
+      meta: { requiresAuth: true }
+    },
     // Catch-all
     {
       path: '/:pathMatch(.*)*',

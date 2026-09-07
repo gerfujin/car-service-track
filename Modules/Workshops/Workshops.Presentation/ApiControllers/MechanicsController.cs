@@ -2,9 +2,9 @@ using App.DTO.v1.Mechanic;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
 using Workshops.Application.Services;
-using WebApp.Mappers;
+using Workshops.Presentation.Mappers;
 
-namespace WebApp.ApiControllers;
+namespace Workshops.Presentation.ApiControllers;
 
 [ApiVersion("1.0")]
 [ApiController]

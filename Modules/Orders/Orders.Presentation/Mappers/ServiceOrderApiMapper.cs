@@ -2,7 +2,7 @@ using App.DTO.v1.Service;
 using App.DTO.v1.ServiceOrder;
 using Orders.Application.DTO;
 
-namespace WebApp.Mappers;
+namespace Orders.Presentation.Mappers;
 
 /// <summary>
 /// Maps the module BLL DTO (Orders.Application.DTO.BllServiceOrder) to the API DTO (ServiceOrderDto).

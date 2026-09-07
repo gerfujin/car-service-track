@@ -3,9 +3,9 @@ using Base.Helpers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Orders.Application.Services;
-using WebApp.ViewModels.Client;
+using Orders.Presentation.ViewModels.Client;
 
-namespace WebApp.Controllers;
+namespace Orders.Presentation.Controllers;
 
 [Authorize]
 public class ServiceOrdersController : Controller

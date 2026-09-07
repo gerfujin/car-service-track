@@ -197,3 +197,25 @@ export interface RestApiErrorResponse {
   status: number
   error: string
 }
+
+// Profile types
+export interface ProfileDto {
+  appUserId: string
+  email: string
+  firstName: string
+  lastName: string
+  address?: string
+  phone?: string
+}
+
+export interface ProfileUpdateDto {
+  firstName: string
+  lastName: string
+  address?: string
+  phone?: string
+}
+
+export interface ProfileUpdateResponseDto {
+  profile: ProfileDto
+  jwt: string
+}

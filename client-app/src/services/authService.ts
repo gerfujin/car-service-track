@@ -45,6 +45,25 @@ export const authService = {
     }
   },
 
+  // Extract display name (firstName/lastName) from JWT payload.
+  // ASP.NET Identity uses ClaimTypes.GivenName/ClaimTypes.Surname which map to these claims.
+  getNameFromJwt(jwt: string): { firstName: string | null; lastName: string | null } {
+    try {
+      const payload = JSON.parse(atob(jwt.split('.')[1]))
+      const firstName =
+        payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname'] ||
+        payload['given_name'] ||
+        null
+      const lastName =
+        payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname'] ||
+        payload['family_name'] ||
+        null
+      return { firstName, lastName }
+    } catch {
+      return { firstName: null, lastName: null }
+    }
+  },
+
   isJwtExpired(jwt: string): boolean {
     try {
       const payload = JSON.parse(atob(jwt.split('.')[1]))

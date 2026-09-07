@@ -1,7 +1,7 @@
 using App.DTO.v1.Service;
 using Workshops.Application.DTO;
 
-namespace WebApp.Mappers;
+namespace Workshops.Presentation.Mappers;
 
 /// <summary>Maps between the module BLL DTO (Workshops.Application.DTO.BllService) and the API DTOs (App.DTO.v1.Service.*).</summary>
 public static class ServiceApiMapper

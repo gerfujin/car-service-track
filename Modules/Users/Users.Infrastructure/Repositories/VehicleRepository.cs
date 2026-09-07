@@ -22,4 +22,11 @@ public class VehicleRepository : BaseRepository<Vehicle>, IVehicleRepository
         return await _context.Vehicles
             .FirstOrDefaultAsync(v => v.Id == id && v.Owner!.AppUserId == appUserId);
     }
+
+    public async Task<Vehicle?> FindByOwnerAsync(Guid id, Guid ownerId)
+    {
+        // Direct FK filter on Vehicle.OwnerId — no join to Owner needed.
+        return await _context.Vehicles
+            .FirstOrDefaultAsync(v => v.Id == id && v.OwnerId == ownerId);
+    }
 }

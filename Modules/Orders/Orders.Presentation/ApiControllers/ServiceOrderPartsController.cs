@@ -7,9 +7,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Orders.Application.Services;
 using Orders.Contracts;
-using WebApp.Mappers;
+using Orders.Presentation.Mappers;
 
-namespace WebApp.ApiControllers;
+namespace Orders.Presentation.ApiControllers;
 
 [ApiVersion("1.0")]
 [ApiController]

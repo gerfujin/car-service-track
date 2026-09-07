@@ -14,7 +14,16 @@ export const useAuthStore = defineStore('auth', () => {
     return !authService.isJwtExpired(jwt.value)
   })
 
-  const displayName = computed(() => userEmail.value || 'User')
+  // Decode display name from JWT payload (given_name/family_name claims).
+  const userName = computed((): { firstName: string | null; lastName: string | null } => {
+    if (!jwt.value) return { firstName: null, lastName: null }
+    return authService.getNameFromJwt(jwt.value)
+  })
+
+  const displayName = computed(() => {
+    const fullName = [userName.value.firstName, userName.value.lastName].filter(Boolean).join(' ').trim()
+    return fullName || userEmail.value || 'User'
+  })
 
   // Decode role(s) from JWT payload
   // ASP.NET Identity uses ClaimTypes.Role which maps to this URI
@@ -89,11 +98,20 @@ export const useAuthStore = defineStore('auth', () => {
     tokenStorage.setTokens(newJwt, newRefreshToken, userEmail.value || undefined)
   }
 
+  // Swaps only the access token (e.g. after a profile update re-issues the JWT with fresh
+  // name claims). The refresh token slot is never touched. Reactive `jwt` means `userName`/
+  // `displayName` re-decode automatically, so the navbar updates without a re-login.
+  function updateJwt(newJwt: string) {
+    jwt.value = newJwt
+    tokenStorage.setJwt(newJwt)
+  }
+
   return {
     jwt,
     refreshToken,
     userEmail,
     isAuthenticated,
+    userName,
     displayName,
     userRoles,
     isAdmin,
@@ -103,6 +121,7 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     register,
     logout,
-    updateTokens
+    updateTokens,
+    updateJwt
   }
 })

@@ -4,10 +4,10 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Orders.Contracts.Commands;
 using Orders.Contracts.Queries;
-using WebApp.Areas.Admin.ViewModels;
+using Orders.Presentation.Areas.Admin.ViewModels;
 using Workshops.Contracts.Queries;
 
-namespace WebApp.Areas.Admin.Controllers;
+namespace Orders.Presentation.Areas.Admin.Controllers;
 
 [Area("Admin")]
 [Authorize(Roles = "admin")]

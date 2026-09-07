@@ -34,6 +34,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IOwnerService, OwnerService>();
         services.AddScoped<IVehicleService, VehicleService>();
         services.AddScoped<IRefreshTokenService, RefreshTokenService>();
+        services.AddScoped<IProfileService, ProfileService>();
 
         return services;
     }

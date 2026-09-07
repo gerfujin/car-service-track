@@ -17,6 +17,9 @@ export const tokenStorage = {
     localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken)
     if (email) localStorage.setItem(USER_EMAIL_KEY, email)
   },
+  // Swaps only the access token (e.g. after a profile update that re-issues the JWT with
+  // fresh name claims). Never touches the refresh token.
+  setJwt: (jwt: string) => localStorage.setItem(JWT_KEY, jwt),
   clearTokens: () => {
     localStorage.removeItem(JWT_KEY)
     localStorage.removeItem(REFRESH_TOKEN_KEY)

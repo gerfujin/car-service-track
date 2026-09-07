@@ -36,6 +36,11 @@ public class VehicleService : IVehicleService
         return VehicleMapper.ToBll(await _uow.Vehicles.FindByUserAsync(id, appUserId));
     }
 
+    public async Task<BllVehicle?> FindByOwnerAsync(Guid id, Guid ownerId)
+    {
+        return VehicleMapper.ToBll(await _uow.Vehicles.FindByOwnerAsync(id, ownerId));
+    }
+
     public BllVehicle Add(BllVehicle entity)
     {
         var added = _uow.Vehicles.Add(VehicleMapper.ToDomain(entity)!);

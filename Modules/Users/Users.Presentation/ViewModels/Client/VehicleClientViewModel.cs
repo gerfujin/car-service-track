@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace WebApp.ViewModels.Client;
+namespace Users.Presentation.ViewModels.Client;
 
 public class VehicleClientViewModel
 {

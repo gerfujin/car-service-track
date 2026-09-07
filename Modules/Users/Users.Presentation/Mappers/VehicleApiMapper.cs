@@ -1,7 +1,7 @@
 using App.DTO.v1.Vehicle;
 using Users.Application.DTO;
 
-namespace WebApp.Mappers;
+namespace Users.Presentation.Mappers;
 
 /// <summary>
 /// Maps between the module BLL DTO (Users.Application.DTO.BllVehicle) and the API DTOs (App.DTO.v1.Vehicle.*).

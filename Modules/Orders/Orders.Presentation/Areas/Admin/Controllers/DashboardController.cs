@@ -2,9 +2,9 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Orders.Contracts.Queries;
-using WebApp.Areas.Admin.ViewModels;
+using Orders.Presentation.Areas.Admin.ViewModels;
 
-namespace WebApp.Areas.Admin.Controllers;
+namespace Orders.Presentation.Areas.Admin.Controllers;
 
 [Area("Admin")]
 [Authorize(Roles = "admin")]

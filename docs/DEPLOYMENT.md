@@ -6,7 +6,7 @@
 
 ---
 
-# CarServiceTrack — A5 Deployment Guide
+# CarServiceTrack — Deployment Guide
 
 ## Table of Contents
 
@@ -19,9 +19,11 @@
 7. [CORS](#cors)
 8. [GitLab CI/CD](#gitlab-cicd)
 9. [Manual Deployment Commands](#manual-deployment-commands)
-10. [Verification Checklist](#verification-checklist)
-11. [Troubleshooting](#troubleshooting)
-12. [Final Deployment Summary](#final-deployment-summary)
+10. [EF Core Migrations](#ef-core-migrations)
+11. [Frontend Source Layout](#frontend-source-layout)
+12. [Verification Checklist](#verification-checklist)
+13. [Troubleshooting](#troubleshooting)
+14. [Final Deployment Summary](#final-deployment-summary)
 
 ---
 
@@ -33,13 +35,13 @@ CarServiceTrack is deployed using Docker Compose and GitLab CI/CD. The frontend 
 - **Backend** is an ASP.NET Core 10 application, exposed on host port `99`.
 - **Database** is PostgreSQL 16, running as a Docker service with named volume `a5_pgdata`.
 
-GitLab CI/CD automatically runs unit and integration tests on every push to `main` and on merge requests. On every push to `main` the deploy stage runs `docker compose -p a5project up --build`.
+GitLab CI/CD automatically runs unit, integration, and architecture tests on every push to `main` and on merge requests. On every push to `main` the deploy stage runs `docker compose -p a5project up --build`.
 
 ---
 
 ## Proxy and Port Mapping
 
-The college reverse proxy routes public domains to the deployment server at `192.168.181.207`:
+The college reverse proxy routes public domains to the deployment server at `<server-ip>`:
 
 | Public URL | Server Host Port | Container Port | Service |
 |---|---|---|---|
@@ -50,7 +52,7 @@ Request flow for the frontend:
 ```
 Browser
   → https://alejeg-finalfront.proxy.itcollege.ee
-  → 192.168.181.207:98
+  → <server-ip>:98
   → Docker container: nginx:80
   → Serves Vue SPA static files
   → JS bundle calls https://alejeg-a5back.proxy.itcollege.ee/api/v1/...
@@ -60,7 +62,7 @@ Request flow for a backend API call:
 ```
 Frontend JS / Swagger
   → https://alejeg-a5back.proxy.itcollege.ee/api/v1/...
-  → 192.168.181.207:99
+  → <server-ip>:99
   → Docker container: ASP.NET Core :8080
   → Returns JSON
 ```
@@ -107,7 +109,7 @@ Environment variables set at runtime:
 ```yaml
 environment:
   ASPNETCORE_ENVIRONMENT: Production
-  ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=carservicetrack;Username=postgres;Password=postgres
+  ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=carservicetrack;Username=postgres;Password=<password>
 ```
 
 Because `ASPNETCORE_ENVIRONMENT` is `Production`, the backend loads `appsettings.json` and then merges `appsettings.Production.json`, which sets the production CORS allowed origins.
@@ -122,14 +124,6 @@ PostgreSQL 16 database.
 | Volume | `a5_pgdata:/var/lib/postgresql/data` |
 | Restart policy | `unless-stopped` |
 | Health check | `pg_isready -U postgres -d carservicetrack` (every 5 s, 10 retries) |
-
-Environment variables:
-```yaml
-environment:
-  POSTGRES_DB: carservicetrack
-  POSTGRES_USER: postgres
-  POSTGRES_PASSWORD: postgres
-```
 
 The backend service uses `depends_on: db: condition: service_healthy` so it only starts after the database passes its health check.
 
@@ -205,15 +199,15 @@ The `?? 'http://localhost:5065'` fallback is only active in local development wh
 | Variable | Value | Description |
 |---|---|---|
 | `ASPNETCORE_ENVIRONMENT` | `Production` | Activates `appsettings.Production.json`; controls CORS and error handling |
-| `ConnectionStrings__DefaultConnection` | `Host=db;Port=5432;Database=carservicetrack;Username=postgres;Password=postgres` | PostgreSQL connection string using the Docker service name `db` |
+| `ConnectionStrings__DefaultConnection` | `Host=db;Port=5432;Database=carservicetrack;Username=postgres;Password=<password>` | PostgreSQL connection string using the Docker service name `db` |
 
 ### Database (set by docker-compose.yml)
 
-| Variable | Value | Description |
-|---|---|---|
-| `POSTGRES_DB` | `carservicetrack` | Database name created on first start |
-| `POSTGRES_USER` | `postgres` | PostgreSQL superuser |
-| `POSTGRES_PASSWORD` | `postgres` | Superuser password |
+| Variable | Description |
+|---|---|
+| `POSTGRES_DB` | Database name created on first start (`carservicetrack`) |
+| `POSTGRES_USER` | PostgreSQL superuser |
+| `POSTGRES_PASSWORD` | Superuser password — set to a real secret outside of local/dev use |
 
 ### Frontend (set at Docker build time)
 
@@ -255,7 +249,11 @@ The production backend explicitly allows cross-origin requests only from the dep
 ```csharp
 var localFrontendOrigins = builder.Configuration
     .GetSection("Cors:AllowedOrigins")
-    .Get<string[]>() ?? Array.Empty<string>();
+    .Get<string[]>()
+    ?.Where(x => !string.IsNullOrWhiteSpace(x))
+    .Select(x => x.TrimEnd('/'))
+    .Distinct(StringComparer.OrdinalIgnoreCase)
+    .ToArray() ?? Array.Empty<string>();
 
 options.AddPolicy("CorsAllowAll", policy =>
 {
@@ -312,7 +310,7 @@ script:
 
 JUnit XML reports are published as GitLab test reports (visible in MR). Code coverage Cobertura XMLs are stored as artifacts (expire in 7 days).
 
-Current test counts: **114 unit tests**, **64 integration tests**, **0 skipped**, **0 failed**.
+Current test counts: 114 unit tests, 74 integration tests, 15 architecture tests — all passing (see the root [README](../README.md#tests) for how to run them).
 
 Integration tests use `WebApplicationFactory<Program>` with SQLite in-memory databases — no PostgreSQL server is needed in CI.
 
@@ -388,6 +386,60 @@ npm run dev
 
 ---
 
+## EF Core Migrations
+
+Each module owns its own `DbContext` and its own migrations folder — there is no shared `App.DAL.EF` project. Run these from the solution root, targeting the module you're changing:
+
+```bash
+dotnet tool update -g dotnet-ef
+
+# Users module
+dotnet ef migrations add <MigrationName> --project Modules/Users/Users.Infrastructure --startup-project WebApp
+dotnet ef database update --project Modules/Users/Users.Infrastructure --startup-project WebApp
+
+# Workshops module
+dotnet ef migrations add <MigrationName> --project Modules/Workshops/Workshops.Infrastructure --startup-project WebApp
+dotnet ef database update --project Modules/Workshops/Workshops.Infrastructure --startup-project WebApp
+
+# Orders module
+dotnet ef migrations add <MigrationName> --project Modules/Orders/Orders.Infrastructure --startup-project WebApp
+dotnet ef database update --project Modules/Orders/Orders.Infrastructure --startup-project WebApp
+```
+
+To remove the last migration for a module, replace `add <MigrationName>` with `remove` in the same form.
+
+---
+
+## Frontend Source Layout
+
+```
+client-app/
+├── src/
+│   ├── components/      # Shared UI components (NavBar.vue)
+│   ├── i18n/             # vue-i18n translations (en.ts, et.ts) + setup (index.ts)
+│   ├── router/           # Vue Router routes and auth/role guards (index.ts)
+│   ├── services/         # Axios API service layer, one file per resource
+│   │                     # (authService, vehicleService, orderService, paymentService,
+│   │                     #  serviceService, sparePartService, workshopService,
+│   │                     #  repairPhotoService, serviceOrderPartService, profileService)
+│   ├── stores/           # Pinia stores (auth.ts, profile.ts)
+│   ├── types/            # Shared TypeScript types (index.ts)
+│   └── views/            # Page components
+│       ├── orders/       # Order list/create/detail/progress/status-update views
+│       ├── payments/     # Payment list/detail views
+│       ├── services/     # Services catalogue view
+│       └── vehicles/     # Vehicle list/create/detail/edit views
+├── .env                  # Default environment (production API URL)
+├── .env.development      # Dev environment (local API URL)
+├── .env.production       # Production environment (documents the production API URL)
+├── Dockerfile            # Standalone client-only Docker build
+├── nginx.conf            # Nginx config for the built SPA
+├── package.json
+└── vite.config.ts
+```
+
+---
+
 ## Verification Checklist
 
 After deployment, verify:
@@ -403,12 +455,12 @@ After deployment, verify:
 - [ ] `docker ps` shows frontend with `0.0.0.0:98->80/tcp`
 - [ ] `docker ps` shows `db` container as `(healthy)`
 - [ ] JWT-protected endpoints return data (not 401)
-- [ ] Admin login: `admin@carservice.ee` / `Admin.12345` → `/Admin/Dashboard` loads
 - [ ] Admin panel does not use ViewBag/ViewData (page titles come from ViewModels)
 - [ ] CI/CD deploy job on GitLab shows green for `main`
 - [ ] CI deploy job uses project name `a5project` (check job log)
-- [ ] Unit tests: `dotnet test ... --configuration Release` → 114 passed
-- [ ] Integration tests: `dotnet test ... --configuration Release` → 64 passed
+- [ ] Unit tests: `dotnet test CarServiceTrack.Tests.Unit --configuration Release` → 114 passed
+- [ ] Integration tests: `dotnet test CarServiceTrack.Tests.Integration --configuration Release` → 74 passed
+- [ ] Architecture tests: `dotnet test Architecture.Tests --configuration Release` → 15 passed
 
 ---
 
@@ -474,11 +526,11 @@ docker compose -p a5project up --build -d
 
 **Symptom:** `docker ps` shows two sets of containers (old and new), port conflicts.
 
-**Cause:** A previous deployment used a different project name (e.g., `personalproject`). Both stacks try to bind the same host ports.
+**Cause:** A previous deployment used a different project name.
 
 **Fix:**
 ```bash
-docker compose -p personalproject down || true
+docker compose -p <old-project-name> down || true
 docker compose -p a5project up --build --remove-orphans -d
 ```
 
@@ -491,8 +543,8 @@ docker compose -p a5project up --build --remove-orphans -d
 **Cause:** The server-side proxy configuration maps the public domain to the wrong host port.
 
 **Verify:**
-- `alejeg-finalfront.proxy.itcollege.ee` must proxy to `192.168.181.207:98`
-- `alejeg-a5back.proxy.itcollege.ee` must proxy to `192.168.181.207:99`
+- `alejeg-finalfront.proxy.itcollege.ee` must proxy to `<server-ip>:98`
+- `alejeg-a5back.proxy.itcollege.ee` must proxy to `<server-ip>:99`
 
 Check with: `docker ps` — look for `0.0.0.0:98->80/tcp` and `0.0.0.0:99->8080/tcp`.
 
@@ -513,13 +565,7 @@ Check with: `docker ps` — look for `0.0.0.0:98->80/tcp` and `0.0.0.0:99->8080/
 }
 ```
 
-**Default seed accounts:**
-
-| Email | Password | Role |
-|---|---|---|
-| admin@carservice.ee | Admin.12345 | admin |
-| mechanic@carservice.ee | Mech.12345 | mechanic |
-| client@carservice.ee | Client.12345 | client |
+Seed identities and reference data (roles, a couple of demo workshops, services, and spare parts) are created by `WebApp/Program.cs` on startup when these flags are enabled. This project's public deployment has working seeded accounts; they are intentionally not listed here — do not assume a fixed set of credentials, and rotate/replace them before treating this configuration as a template for a real deployment.
 
 ---
 
@@ -573,5 +619,6 @@ Swagger is enabled in all environments (not gated by `IsDevelopment()`).
 | Backend environment | Production |
 | Production CORS | https://alejeg-finalfront.proxy.itcollege.ee |
 | CI/CD | GitLab CI — stages: test → deploy |
-| Unit tests | 114 passed, 0 failed, 0 skipped |
-| Integration tests | 64 passed, 0 failed, 0 skipped |
+| Unit tests | 114 passed |
+| Integration tests | 74 passed |
+| Architecture tests | 15 passed |

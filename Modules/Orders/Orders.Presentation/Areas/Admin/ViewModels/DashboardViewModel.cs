@@ -1,4 +1,4 @@
-namespace WebApp.Areas.Admin.ViewModels;
+namespace Orders.Presentation.Areas.Admin.ViewModels;
 
 public class DashboardViewModel : AdminPageViewModelBase
 {

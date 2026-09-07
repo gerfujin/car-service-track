@@ -4,9 +4,9 @@ using Microsoft.AspNetCore.Mvc;
 using Users.Application.DTO;
 using Users.Application.Services;
 using Users.Contracts;
-using WebApp.ViewModels.Client;
+using Users.Presentation.ViewModels.Client;
 
-namespace WebApp.Controllers;
+namespace Users.Presentation.Controllers;
 
 [Authorize]
 public class VehiclesController : Controller

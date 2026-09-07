@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Http;
 
-namespace WebApp.ApiControllers;
+namespace Orders.Presentation.ApiControllers;
 
 public class RepairPhotoUploadRequest
 {
