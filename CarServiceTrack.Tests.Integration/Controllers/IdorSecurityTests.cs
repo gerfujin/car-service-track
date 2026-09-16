@@ -13,7 +13,7 @@ namespace CarServiceTrack.Tests.Integration.Controllers;
 /// is collected here so they are clearly visible in the test report.
 /// </summary>
 [Collection("Integration")]
-public class IborSecurityTests : IAsyncLifetime
+public class IdorSecurityTests : IAsyncLifetime
 {
     private readonly CustomWebApplicationFactory _factory = new();
     private HttpClient _client = null!;
