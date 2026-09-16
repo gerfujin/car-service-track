@@ -113,6 +113,10 @@ Seeded test accounts (`DataInitialization:SeedIdentity` — on by default), one 
 
 ### Without Docker
 
+> Not re-verified during the deployment cleanup pass (only the Docker path above was
+> re-run end to end). The steps below match the project's actual `dotnet`/`npm`
+> commands and ports, but treat them as unconfirmed until someone runs them.
+
 Requires .NET 10 SDK, Node.js 20+, and a local PostgreSQL 16 instance.
 
 **Backend:**
