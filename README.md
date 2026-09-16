@@ -111,36 +111,6 @@ Seeded test accounts (`DataInitialization:SeedIdentity` — on by default), one 
 | Mechanic | `mechanic@carservice.ee` | `Mech.12345` |
 | Admin | `admin@carservice.ee` | `Admin.12345` |
 
-### Without Docker
-
-> Not re-verified during the deployment cleanup pass (only the Docker path above was
-> re-run end to end). The steps below match the project's actual `dotnet`/`npm`
-> commands and ports, but treat them as unconfirmed until someone runs them.
-
-Requires .NET 10 SDK, Node.js 20+, and a local PostgreSQL 16 instance.
-
-**Backend:**
-
-```bash
-dotnet restore pesonal.sln
-dotnet ef database update --project Modules/Users/Users.Infrastructure --startup-project WebApp
-dotnet ef database update --project Modules/Workshops/Workshops.Infrastructure --startup-project WebApp
-dotnet ef database update --project Modules/Orders/Orders.Infrastructure --startup-project WebApp
-dotnet run --project WebApp
-```
-
-Each module owns its own `DbContext` and migrations. Backend listens on `http://localhost:5065` (Swagger at `/swagger`).
-
-**Frontend** (separate terminal):
-
-```bash
-cd client-app
-npm install
-npm run dev
-```
-
-The dev server runs at `http://localhost:5173` and proxies `/api` requests to `http://localhost:5065` (see `vite.config.ts`).
-
 ## Configuration
 
 Backend config lives in `appsettings.json` / `appsettings.{Environment}.json`, overridable by environment variables (ASP.NET Core's `__` maps to nested JSON keys):
