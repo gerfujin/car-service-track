@@ -6,7 +6,7 @@ RUN npm ci
 
 COPY client-app/ .
 
-ARG VITE_API_BASE_URL=https://alejeg-a5back.proxy.itcollege.ee
+ARG VITE_API_BASE_URL=http://localhost:99
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
 RUN npm run build

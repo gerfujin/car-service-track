@@ -1,10 +1,15 @@
+# Local defaults below (host ports 98/frontend, 99/backend; postgres/postgres db
+# credentials; a placeholder JWT signing key) work out of the box with
+# `docker compose up --build`. Override any of them via a root-level `.env` file
+# (see `.env.example`) instead of editing this file for anything that matters
+# beyond a disposable local stack.
 services:
   frontend:
     build:
       context: .
       dockerfile: Dockerfile
       args:
-        VITE_API_BASE_URL: https://alejeg-a5back.proxy.itcollege.ee
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:99}
     ports:
       - "98:80"
     depends_on:
@@ -22,7 +27,12 @@ services:
         condition: service_healthy
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=carservicetrack;Username=postgres;Password=postgres
+      ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=carservicetrack;Username=postgres;Password=${POSTGRES_PASSWORD:-postgres}
+      Cors__AllowedOrigins__0: ${FRONTEND_ORIGIN:-http://localhost:98}
+      # Dev-only default signing key so the stack works without extra setup.
+      # Override via JWT_KEY for anything beyond a disposable local stack —
+      # generate one with `openssl rand -base64 64`.
+      JWT__Key: ${JWT_KEY:-aLCdRVZEqcP4yWhstgoq4557dZNrb8MuQgpx7WthetTQryIkuz1NsRBr3jsfamJK}
     restart: unless-stopped
 
   db:
@@ -30,7 +40,7 @@ services:
     environment:
       POSTGRES_DB: carservicetrack
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     volumes:
       - a5_pgdata:/var/lib/postgresql/data
     restart: unless-stopped
