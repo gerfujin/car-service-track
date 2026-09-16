@@ -2,11 +2,10 @@
 
 A car service management system: clients book vehicles in for service, mechanics work orders and log repairs, admins run the workshop. Full-stack learning project (ASP.NET Core backend, Vue 3 SPA frontend) built as a portfolio piece for junior developer applications.
 
-## Live demo
+Previously deployed to a college server; that environment is no longer available — see [Deployment](#deployment). Run it locally with the [Getting started](#running-locally) steps below.
 
-- Frontend: https://alejeg-finalfront.proxy.itcollege.ee
-- Swagger: https://alejeg-a5back.proxy.itcollege.ee/swagger
-
+<!-- Screenshots: docs/screenshots/*.png — TODO -->
+<!-- Demo video: TODO -->
 <!-- ![CarServiceTrack screenshot](docs/screenshot.png) -->
 
 ## What it does
@@ -102,7 +101,15 @@ Requires Docker and Docker Compose.
 docker compose up --build
 ```
 
-This starts three services (see `docker-compose.yml`): frontend at `http://localhost:98`, backend + Swagger at `http://localhost:99/swagger`, and a PostgreSQL 16 `db` service on a named volume (`a5_pgdata`), internal to the Compose network.
+This starts three services (see `docker-compose.yml`): frontend at `http://localhost:98`, backend + Swagger at `http://localhost:99/swagger`, and a PostgreSQL 16 `db` service on a named volume (`a5_pgdata`), internal to the Compose network. All config (API URL, CORS origin, DB password, JWT key) has working local defaults — see [Configuration](#configuration) to override any of them via a root `.env` (copy from `.env.example`).
+
+Seeded test accounts (`DataInitialization:SeedIdentity` — on by default), one per role:
+
+| Role | Email | Password |
+|---|---|---|
+| Client | `client@carservice.ee` | `Client.12345` |
+| Mechanic | `mechanic@carservice.ee` | `Mech.12345` |
+| Admin | `admin@carservice.ee` | `Admin.12345` |
 
 ### Without Docker
 
@@ -144,6 +151,8 @@ Backend config lives in `appsettings.json` / `appsettings.{Environment}.json`, o
 
 Generate a JWT signing key locally with `openssl rand -base64 64`, then set it via `dotnet user-secrets` in development or as a `JWT__Key` environment variable in any deployed environment — never commit a real key to `appsettings.json`. If `Cors:AllowedOrigins` is left empty, the backend falls back to allowing any origin (`Program.cs`); that fallback is for local/testing use only.
 
+For `docker compose up --build`, all of the above already have working local defaults baked into `docker-compose.yml`; copy [.env.example](.env.example) to `.env` at the repo root to override them. The frontend's own `VITE_API_BASE_URL` defaults are documented in [client-app/.env.example](client-app/.env.example).
+
 ## Tests
 
 Three test projects, 203 tests total, all passing:
@@ -163,6 +172,18 @@ dotnet test CarServiceTrack.Tests.Unit/CarServiceTrack.Tests.Unit.csproj
 
 ## Deployment
 
-The project deploys as two Docker images (frontend/nginx and backend) plus a PostgreSQL container, orchestrated by `docker-compose.yml` and built/deployed by GitLab CI (`.gitlab-ci.yml`): tests run on every push and merge request, and `main` auto-deploys on a green build. The frontend bakes its API base URL into the JS bundle at Docker build time (`VITE_API_BASE_URL` build arg), so changing the backend URL requires a rebuild, not just a config change. The backend's CORS policy is environment-driven (`Cors:AllowedOrigins` in `appsettings.{Environment}.json`) and only allows the deployed frontend origin in production.
+Previously deployed to a TalTech IT College server behind a reverse proxy
+(`*.proxy.itcollege.ee`) via GitLab CI and Docker Compose. That environment is no
+longer available — there is no live instance of this project right now.
 
-See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the full deployment guide, including port/proxy mapping, CORS details, manual deployment commands, and troubleshooting.
+The project still deploys as two Docker images (frontend/nginx and backend) plus a
+PostgreSQL container, orchestrated by `docker-compose.yml`. GitLab CI (`.gitlab-ci.yml`)
+runs tests on every push and merge request; the `deploy` stage that used to push
+`main` to the college server has been removed. The frontend bakes its API base URL
+into the JS bundle at Docker build time (`VITE_API_BASE_URL` build arg), so changing
+the backend URL requires a rebuild, not just a config change. The backend's CORS
+policy is environment-driven (`Cors:AllowedOrigins` in `appsettings.{Environment}.json`).
+
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the full (now historical) deployment
+guide, including port mapping, CORS details, and troubleshooting for running the
+stack locally.
