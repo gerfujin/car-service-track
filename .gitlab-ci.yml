@@ -1,6 +1,5 @@
 stages:
   - test
-  - deploy
 
 dotnet-tests:
   stage: test
@@ -68,13 +67,3 @@ e2e-tests:
       - client-app/playwright-report/
       - client-app/playwright-results.xml
     expire_in: 7 days
-
-deploy:
-  stage: deploy
-  only:
-    - main
-  tags:
-    - shared
-  script:
-    - docker compose -p a5project down || true
-    - docker compose -p a5project up --build --remove-orphans -d
