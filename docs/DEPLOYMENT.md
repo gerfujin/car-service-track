@@ -1,77 +1,73 @@
-# Live Deployment Links
-
-- Frontend: https://alejeg-finalfront.proxy.itcollege.ee
-- Backend API: https://alejeg-a5back.proxy.itcollege.ee
-- Backend Swagger: https://alejeg-a5back.proxy.itcollege.ee/swagger
-
----
-
 # CarServiceTrack — Deployment Guide
+
+> **Historical document.** Previously deployed to a TalTech IT College server behind a
+> reverse proxy (`*.proxy.itcollege.ee`) via GitLab CI and Docker Compose. That
+> environment is no longer available. This guide otherwise still describes the
+> current Docker/CORS/CI setup — see the [README](../README.md#running-locally) for
+> how to run the project locally today.
 
 ## Table of Contents
 
 1. [Project Deployment Overview](#project-deployment-overview)
-2. [Proxy and Port Mapping](#proxy-and-port-mapping)
+2. [Port Mapping](#port-mapping)
 3. [Docker Compose Services](#docker-compose-services)
 4. [Backend Dockerfile](#backend-dockerfile)
 5. [Frontend Dockerfile](#frontend-dockerfile)
 6. [Environment Variables](#environment-variables)
 7. [CORS](#cors)
 8. [GitLab CI/CD](#gitlab-cicd)
-9. [Manual Deployment Commands](#manual-deployment-commands)
+9. [Manual Docker Compose Commands](#manual-docker-compose-commands)
 10. [EF Core Migrations](#ef-core-migrations)
 11. [Frontend Source Layout](#frontend-source-layout)
-12. [Verification Checklist](#verification-checklist)
-13. [Troubleshooting](#troubleshooting)
-14. [Final Deployment Summary](#final-deployment-summary)
+12. [Troubleshooting](#troubleshooting)
 
 ---
 
 ## Project Deployment Overview
 
-CarServiceTrack is deployed using Docker Compose and GitLab CI/CD. The frontend (Vue 3 + Vite + nginx) and the backend (ASP.NET Core 10) are built as separate Docker images and hosted as separate services on the same server.
+CarServiceTrack was deployed using Docker Compose and GitLab CI/CD. The frontend
+(Vue 3 + Vite + nginx) and the backend (ASP.NET Core 10) were built as separate
+Docker images and hosted as separate services on the same server.
 
-- **Frontend** is served by nginx inside a Docker container, exposed on host port `98`.
-- **Backend** is an ASP.NET Core 10 application, exposed on host port `99`.
-- **Database** is PostgreSQL 16, running as a Docker service with named volume `a5_pgdata`.
+- **Frontend** was served by nginx inside a Docker container, exposed on host port `98`.
+- **Backend** was an ASP.NET Core 10 application, exposed on host port `99`.
+- **Database** was PostgreSQL 16, running as a Docker service with named volume `a5_pgdata`.
 
-GitLab CI/CD automatically runs unit, integration, and architecture tests on every push to `main` and on merge requests. On every push to `main` the deploy stage runs `docker compose -p a5project up --build`.
+GitLab CI/CD still runs unit, integration, and architecture tests on every push to
+`main` and on merge requests (see [GitLab CI/CD](#gitlab-cicd)). The `deploy` stage
+that used to push `main` to the college server has been removed from
+`.gitlab-ci.yml`, since that host is no longer reachable.
 
 ---
 
-## Proxy and Port Mapping
+## Port Mapping
 
-The college reverse proxy routes public domains to the deployment server at `<server-ip>`:
+A reverse proxy on the college server used to route two public domains to this
+deployment's host ports. Locally, `docker-compose.yml` exposes the same ports
+directly, without a proxy in front:
 
-| Public URL | Server Host Port | Container Port | Service |
-|---|---|---|---|
-| https://alejeg-finalfront.proxy.itcollege.ee | 98 | 80 (nginx) | frontend |
-| https://alejeg-a5back.proxy.itcollege.ee | 99 | 8080 (ASP.NET Core) | backend |
+| Service | Host Port | Container Port |
+|---|---|---|
+| frontend (nginx) | 98 | 80 |
+| backend (ASP.NET Core) | 99 | 8080 |
 
-Request flow for the frontend:
+Request flow for the frontend, unchanged whether run locally or (previously) behind
+the college proxy:
 ```
 Browser
-  → https://alejeg-finalfront.proxy.itcollege.ee
-  → <server-ip>:98
+  → http://localhost:98        (or the public domain, when one existed)
   → Docker container: nginx:80
   → Serves Vue SPA static files
-  → JS bundle calls https://alejeg-a5back.proxy.itcollege.ee/api/v1/...
-```
-
-Request flow for a backend API call:
-```
-Frontend JS / Swagger
-  → https://alejeg-a5back.proxy.itcollege.ee/api/v1/...
-  → <server-ip>:99
-  → Docker container: ASP.NET Core :8080
-  → Returns JSON
+  → JS bundle calls the backend's /api/v1/... over VITE_API_BASE_URL
 ```
 
 ---
 
 ## Docker Compose Services
 
-The `docker-compose.yml` defines three services. All are started under the Docker Compose project name **`a5project`**.
+The `docker-compose.yml` at the repo root defines three services, started together
+with `docker compose up --build`. All local defaults are safe to run as-is; see
+[Environment Variables](#environment-variables) to override them.
 
 ### frontend
 
@@ -88,10 +84,11 @@ Builds the Vue 3 SPA from the root `Dockerfile` (Node 20 Alpine build → nginx 
 Build argument passed at build time:
 ```yaml
 args:
-  VITE_API_BASE_URL: https://alejeg-a5back.proxy.itcollege.ee
+  VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:99}
 ```
 
-`VITE_API_BASE_URL` is baked into the compiled JS bundle at Docker build time and cannot be changed at runtime without rebuilding.
+`VITE_API_BASE_URL` is baked into the compiled JS bundle at Docker build time and
+cannot be changed at runtime without rebuilding.
 
 ### backend
 
@@ -105,14 +102,17 @@ Builds the ASP.NET Core web application from `WebApp/Dockerfile`.
 | Depends on | `db` (waits for healthy) |
 | Restart policy | `unless-stopped` |
 
-Environment variables set at runtime:
+Environment variables set at runtime (see `docker-compose.yml` for the full list,
+including CORS origin and JWT key):
 ```yaml
 environment:
   ASPNETCORE_ENVIRONMENT: Production
-  ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=carservicetrack;Username=postgres;Password=<password>
+  ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=carservicetrack;Username=postgres;Password=${POSTGRES_PASSWORD:-postgres}
 ```
 
-Because `ASPNETCORE_ENVIRONMENT` is `Production`, the backend loads `appsettings.json` and then merges `appsettings.Production.json`, which sets the production CORS allowed origins.
+Because `ASPNETCORE_ENVIRONMENT` is `Production`, the backend loads `appsettings.json`
+and then merges `appsettings.Production.json`, which sets the CORS allowed origins
+(overridable via `Cors__AllowedOrigins__0`, see [CORS](#cors)).
 
 ### db
 
@@ -125,7 +125,8 @@ PostgreSQL 16 database.
 | Restart policy | `unless-stopped` |
 | Health check | `pg_isready -U postgres -d carservicetrack` (every 5 s, 10 retries) |
 
-The backend service uses `depends_on: db: condition: service_healthy` so it only starts after the database passes its health check.
+The backend service uses `depends_on: db: condition: service_healthy` so it only
+starts after the database passes its health check.
 
 ---
 
@@ -148,9 +149,14 @@ EXPOSE 8080
 ENTRYPOINT ["dotnet", "WebApp.dll"]
 ```
 
-- **Stage 1 (build):** Full .NET SDK 10 image. Copies the entire repository, restores NuGet packages, and publishes `WebApp` in Release configuration. All `appsettings*.json` files are included in the publish output automatically.
-- **Stage 2 (runtime):** Lighter ASP.NET Core runtime image. Copies only the published output. Sets `ASPNETCORE_URLS=http://+:8080` so the app listens on all interfaces on port 8080.
-- `ASPNETCORE_ENVIRONMENT=Production` is injected by `docker-compose.yml` at container start time, not inside the Dockerfile.
+- **Stage 1 (build):** Full .NET SDK 10 image. Copies the entire repository, restores
+  NuGet packages, and publishes `WebApp` in Release configuration. All
+  `appsettings*.json` files are included in the publish output automatically.
+- **Stage 2 (runtime):** Lighter ASP.NET Core runtime image. Copies only the
+  published output. Sets `ASPNETCORE_URLS=http://+:8080` so the app listens on all
+  interfaces on port 8080.
+- `ASPNETCORE_ENVIRONMENT=Production` is injected by `docker-compose.yml` at
+  container start time, not inside the Dockerfile.
 
 ---
 
@@ -164,7 +170,7 @@ WORKDIR /app
 COPY client-app/package*.json ./
 RUN npm ci
 COPY client-app/ .
-ARG VITE_API_BASE_URL=https://alejeg-a5back.proxy.itcollege.ee
+ARG VITE_API_BASE_URL=http://localhost:99
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 RUN npm run build
 
@@ -173,12 +179,18 @@ COPY client-app/nginx.conf /etc/nginx/nginx.conf
 COPY --from=build /app/dist /usr/share/nginx/html
 ```
 
-- **Stage 1 (build):** Node 20 Alpine. Installs dependencies with `npm ci`, then runs `vite build`. The `VITE_API_BASE_URL` argument is baked into the JS bundle at this stage.
-- **Stage 2 (serve):** nginx Alpine serves the compiled `dist/` directory as static files using `client-app/nginx.conf`.
+- **Stage 1 (build):** Node 20 Alpine. Installs dependencies with `npm ci`, then runs
+  `vite build`. The `VITE_API_BASE_URL` argument is baked into the JS bundle at this
+  stage.
+- **Stage 2 (serve):** nginx Alpine serves the compiled `dist/` directory as static
+  files using `client-app/nginx.conf`.
 
-The default value for `VITE_API_BASE_URL` in the Dockerfile is `https://alejeg-a5back.proxy.itcollege.ee`. `docker-compose.yml` passes the same value as a build argument, so both standalone and compose builds produce the same result.
+`docker-compose.yml` passes `VITE_API_BASE_URL` as a build argument (defaulting to
+`http://localhost:99`), so both standalone and compose builds produce the same
+result unless overridden.
 
-There is also `client-app/Dockerfile` with an identical pattern — used for standalone client-only builds.
+There is also `client-app/Dockerfile` with an identical pattern — used for
+standalone client-only builds.
 
 ### How VITE_API_BASE_URL reaches runtime JS
 
@@ -188,57 +200,47 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5065
 const API_V1 = `${API_BASE_URL}/api/v1`
 ```
 
-The `?? 'http://localhost:5065'` fallback is only active in local development when no environment file is loaded.
+The `?? 'http://localhost:5065'` fallback is only active in local development when
+no environment file is loaded.
 
 ---
 
 ## Environment Variables
 
-### Backend (set by docker-compose.yml at runtime)
+All of these have working local defaults in `docker-compose.yml` — nothing below is
+required to run `docker compose up --build`. Override any of them by copying the
+root [.env.example](../.env.example) to `.env`.
 
-| Variable | Value | Description |
+| Variable | Local default | Description |
 |---|---|---|
-| `ASPNETCORE_ENVIRONMENT` | `Production` | Activates `appsettings.Production.json`; controls CORS and error handling |
-| `ConnectionStrings__DefaultConnection` | `Host=db;Port=5432;Database=carservicetrack;Username=postgres;Password=<password>` | PostgreSQL connection string using the Docker service name `db` |
+| `VITE_API_BASE_URL` | `http://localhost:99` | Frontend build-time API base URL; baked into the JS bundle |
+| `FRONTEND_ORIGIN` | `http://localhost:98` | Backend CORS allowed origin |
+| `POSTGRES_PASSWORD` | `postgres` | Password for both the `db` and backend services |
+| `JWT_KEY` | a disposable placeholder committed in `docker-compose.yml` | JWT signing key; generate a real one with `openssl rand -base64 64` for anything beyond a throwaway local stack |
 
-### Database (set by docker-compose.yml)
+### Local development overrides (outside Docker)
 
-| Variable | Description |
-|---|---|
-| `POSTGRES_DB` | Database name created on first start (`carservicetrack`) |
-| `POSTGRES_USER` | PostgreSQL superuser |
-| `POSTGRES_PASSWORD` | Superuser password — set to a real secret outside of local/dev use |
-
-### Frontend (set at Docker build time)
-
-| Variable | Value | Description |
-|---|---|---|
-| `VITE_API_BASE_URL` | `https://alejeg-a5back.proxy.itcollege.ee` | Baked into JS bundle; cannot be changed without rebuild |
-
-### Local development overrides
-
-`client-app/.env.development` (committed):
+`client-app/.env.development` (committed), used by `npm run dev`:
 ```
 VITE_API_BASE_URL=http://localhost:5065
 ```
 
-`client-app/.env` (committed, used when no environment-specific file matches):
-```
-VITE_API_BASE_URL=https://alejeg-a5back.proxy.itcollege.ee
-```
+See `client-app/.env.example` for how the committed `.env` / `.env.development` /
+`.env.production` files relate to each other.
 
 ---
 
 ## CORS
 
-The production backend explicitly allows cross-origin requests only from the deployed frontend.
+The backend's CORS policy allows only the configured frontend origin(s).
 
-**`WebApp/appsettings.Production.json`:**
+**`WebApp/appsettings.Production.json`** (local default; override via
+`Cors__AllowedOrigins__0` or `FRONTEND_ORIGIN` in `docker-compose.yml`):
 ```json
 {
   "Cors": {
     "AllowedOrigins": [
-      "https://alejeg-finalfront.proxy.itcollege.ee"
+      "http://localhost:98"
     ]
   }
 }
@@ -272,26 +274,23 @@ options.AddPolicy("CorsAllowAll", policy =>
 ```
 
 The policy allows:
-- **Origins:** `https://alejeg-finalfront.proxy.itcollege.ee` (production only)
+- **Origins:** whatever is configured via `Cors:AllowedOrigins` (production/compose) —
+  locally, `http://localhost:98`
 - **Headers:** Any — covers `Authorization: Bearer <token>`, `Content-Type`, custom headers
 - **Methods:** Any — covers GET, POST, PUT, PATCH, DELETE
 
 No `AllowCredentials()` is needed or used — JWT Bearer authentication does not use cookies.
 
-**Development CORS** (`WebApp/appsettings.Development.json`) includes:
-- `http://localhost:5173` (Vite dev server)
-- `http://localhost:8080`
-- `https://alejeg-finalfront.proxy.itcollege.ee`
+**Development CORS** (`WebApp/appsettings.Development.json`, used by `dotnet run`)
+allows `http://localhost:5173` (Vite dev server) and `http://localhost:8080`.
 
 ---
 
 ## GitLab CI/CD
 
-`.gitlab-ci.yml` defines two stages: `test` and `deploy`.
+`.gitlab-ci.yml` defines one stage: `test`.
 
-### Stage: test
-
-#### `dotnet-tests` job
+### `dotnet-tests` job
 
 Runs automatically on every push to `main` and every merge request.
 
@@ -308,36 +307,51 @@ script:
       --collect:"XPlat Code Coverage" --results-directory TestResults/integration
 ```
 
-JUnit XML reports are published as GitLab test reports (visible in MR). Code coverage Cobertura XMLs are stored as artifacts (expire in 7 days).
+JUnit XML reports are published as GitLab test reports (visible in MR). Code
+coverage Cobertura XMLs are stored as artifacts (expire in 7 days).
 
-Current test counts: 114 unit tests, 74 integration tests, 15 architecture tests — all passing (see the root [README](../README.md#tests) for how to run them).
+Current test counts: 114 unit tests, 74 integration tests, 15 architecture tests —
+all passing (see the root [README](../README.md#tests) for how to run them).
 
-Integration tests use `WebApplicationFactory<Program>` with SQLite in-memory databases — no PostgreSQL server is needed in CI.
+Integration tests use `WebApplicationFactory<Program>` with SQLite in-memory
+databases — no PostgreSQL server is needed in CI.
 
-#### `e2e-tests` job
+### `e2e-tests` job
 
-Manual trigger only (`when: manual`), `allow_failure: true`. Starts the full stack with `docker compose -p a5-e2e up --build -d`, runs Playwright tests against `http://localhost:98`, then tears down with `docker compose -p a5-e2e down`.
+Manual trigger only (`when: manual`), `allow_failure: true`. Starts the full stack
+with `docker compose -p a5-e2e up --build -d`, runs Playwright tests against
+`http://localhost:98`, then tears down with `docker compose -p a5-e2e down`. This
+job is self-contained (it only talks to containers it starts itself), so it does
+not depend on the retired college server.
 
-### Stage: deploy
+### Removed: `deploy` stage
 
-Runs only on push to `main`:
-
+The pipeline previously had a `deploy` stage that ran on every push to `main`:
 ```yaml
 script:
   - docker compose -p a5project down || true
   - docker compose -p a5project up --build --remove-orphans -d
 ```
+This has been removed — it targeted the college server's Docker host, which is no
+longer accessible.
 
-Stops the existing `a5project` deployment, rebuilds all images, and starts fresh. `--remove-orphans` removes containers for services removed from the compose file.
+> **Note:** `dotnet-tests` and `e2e-tests` both carry `tags: [shared]`, the same tag
+> the removed `deploy` job used. Whether that GitLab Runner is generic shared CI
+> infrastructure or was tied specifically to the retired server isn't determinable
+> from this repo — if pipelines stop picking up jobs, that tag/runner is the first
+> thing to check.
 
 ---
 
-## Manual Deployment Commands
+## Manual Docker Compose Commands
 
-### Deploy or redeploy
+These operate on whatever host you run them on — there's no remote target anymore,
+so for a local checkout they act on your own machine.
+
+### Start or restart the stack
 
 ```bash
-# Stop current deployment
+# Stop the current stack
 docker compose -p a5project down
 
 # Rebuild all images and start (detached)
@@ -350,16 +364,9 @@ docker ps
 ### View logs
 
 ```bash
-# Backend logs (live stream)
 docker compose -p a5project logs -f backend
-
-# Frontend logs (live stream)
 docker compose -p a5project logs -f frontend
-
-# Database logs (live stream)
 docker compose -p a5project logs -f db
-
-# All services combined
 docker compose -p a5project logs -f
 ```
 
@@ -369,7 +376,7 @@ docker compose -p a5project logs -f
 docker compose -p a5project exec db psql -U postgres -d carservicetrack
 ```
 
-### Local development
+### Without Docker
 
 ```bash
 # Backend (requires PostgreSQL running locally)
@@ -388,7 +395,9 @@ npm run dev
 
 ## EF Core Migrations
 
-Each module owns its own `DbContext` and its own migrations folder — there is no shared `App.DAL.EF` project. Run these from the solution root, targeting the module you're changing:
+Each module owns its own `DbContext` and its own migrations folder — there is no
+shared `App.DAL.EF` project. Run these from the solution root, targeting the module
+you're changing:
 
 ```bash
 dotnet tool update -g dotnet-ef
@@ -406,7 +415,8 @@ dotnet ef migrations add <MigrationName> --project Modules/Orders/Orders.Infrast
 dotnet ef database update --project Modules/Orders/Orders.Infrastructure --startup-project WebApp
 ```
 
-To remove the last migration for a module, replace `add <MigrationName>` with `remove` in the same form.
+To remove the last migration for a module, replace `add <MigrationName>` with
+`remove` in the same form.
 
 ---
 
@@ -429,9 +439,10 @@ client-app/
 │       ├── payments/     # Payment list/detail views
 │       ├── services/     # Services catalogue view
 │       └── vehicles/     # Vehicle list/create/detail/edit views
-├── .env                  # Default environment (production API URL)
+├── .env                  # Fallback environment
 ├── .env.development      # Dev environment (local API URL)
-├── .env.production       # Production environment (documents the production API URL)
+├── .env.production       # Production environment (placeholder — no live deployment)
+├── .env.example          # Documents how the above relate to each other
 ├── Dockerfile            # Standalone client-only Docker build
 ├── nginx.conf            # Nginx config for the built SPA
 ├── package.json
@@ -440,63 +451,39 @@ client-app/
 
 ---
 
-## Verification Checklist
-
-After deployment, verify:
-
-- [ ] https://alejeg-finalfront.proxy.itcollege.ee opens — frontend loads, navbar is visible
-- [ ] https://alejeg-a5back.proxy.itcollege.ee/swagger opens — all API endpoint groups are listed
-- [ ] Register a new user via frontend — succeeds, redirects to home
-- [ ] Login with registered credentials — JWT received, stored in browser
-- [ ] Vehicles page loads — authenticated GET request returns data
-- [ ] DevTools → Network: API requests go to `https://alejeg-a5back.proxy.itcollege.ee`
-- [ ] No CORS errors in browser console
-- [ ] `docker ps` shows backend with `0.0.0.0:99->8080/tcp`
-- [ ] `docker ps` shows frontend with `0.0.0.0:98->80/tcp`
-- [ ] `docker ps` shows `db` container as `(healthy)`
-- [ ] JWT-protected endpoints return data (not 401)
-- [ ] Admin panel does not use ViewBag/ViewData (page titles come from ViewModels)
-- [ ] CI/CD deploy job on GitLab shows green for `main`
-- [ ] CI deploy job uses project name `a5project` (check job log)
-- [ ] Unit tests: `dotnet test CarServiceTrack.Tests.Unit --configuration Release` → 114 passed
-- [ ] Integration tests: `dotnet test CarServiceTrack.Tests.Integration --configuration Release` → 74 passed
-- [ ] Architecture tests: `dotnet test Architecture.Tests --configuration Release` → 15 passed
-
----
-
 ## Troubleshooting
 
-### Frontend calls old backend URL or localhost
+These apply to running the stack locally with `docker compose up --build`.
 
-**Symptom:** Browser Network tab shows requests to `localhost:5065` or a stale domain.
+### Frontend calls the wrong backend URL
 
-**Cause:** `VITE_API_BASE_URL` was either not set or was set to the wrong value at Docker build time. The fallback `http://localhost:5065` in `api.ts` activates.
+**Symptom:** Browser Network tab shows requests to a stale or unreachable domain
+instead of `http://localhost:99`.
 
-**Fix:** Confirm `docker-compose.yml` build args:
-```yaml
-args:
-  VITE_API_BASE_URL: https://alejeg-a5back.proxy.itcollege.ee
-```
-Then force a rebuild: `docker compose -p a5project up --build -d`
+**Cause:** `VITE_API_BASE_URL` was set to the wrong value at Docker build time — it's
+baked into the bundle and can't be changed at runtime.
+
+**Fix:** Check the `VITE_API_BASE_URL` build arg in `docker-compose.yml` (or your
+root `.env`, see [Environment Variables](#environment-variables)), then force a
+rebuild: `docker compose -p a5project up --build -d`
 
 ---
 
 ### CORS error in browser console
 
-**Symptom:** `Access to fetch at 'https://alejeg-a5back...' from origin 'https://alejeg-finalfront...' has been blocked by CORS policy`
+**Symptom:** `Access to fetch at 'http://localhost:99/...' from origin
+'http://localhost:98' has been blocked by CORS policy`
 
-**Cause:** Backend is not running in Production environment, or `appsettings.Production.json` is missing / not included in the publish output.
+**Cause:** Backend is not running in Production environment, `appsettings.Production.json`
+is missing from the publish output, or `Cors:AllowedOrigins` / `FRONTEND_ORIGIN`
+doesn't match the origin the frontend is actually served from.
 
-**Fix 1:** Verify `docker-compose.yml` sets `ASPNETCORE_ENVIRONMENT: Production` for the backend service.
+**Fix 1:** Verify `docker-compose.yml` sets `ASPNETCORE_ENVIRONMENT: Production` for
+the backend service.
 
-**Fix 2:** Verify `WebApp/appsettings.Production.json` exists and contains:
-```json
-{
-  "Cors": {
-    "AllowedOrigins": ["https://alejeg-finalfront.proxy.itcollege.ee"]
-  }
-}
-```
+**Fix 2:** Verify `WebApp/appsettings.Production.json` exists and its
+`Cors:AllowedOrigins` (or the `FRONTEND_ORIGIN` override) matches the URL you're
+loading the frontend from.
 
 **Fix 3:** Rebuild after any config change: `docker compose -p a5project up --build -d`
 
@@ -504,7 +491,8 @@ Then force a rebuild: `docker compose -p a5project up --build -d`
 
 ### Backend cannot connect to database
 
-**Symptom:** Backend container exits immediately or logs show `Unable to obtain data source`. Health check for `db` fails or times out.
+**Symptom:** Backend container exits immediately or logs show
+`Unable to obtain data source`. Health check for `db` fails or times out.
 
 **Cause:** Database not yet ready, or volume is corrupted.
 
@@ -524,9 +512,9 @@ docker compose -p a5project up --build -d
 
 ### Wrong Docker Compose project name leaves old containers running
 
-**Symptom:** `docker ps` shows two sets of containers (old and new), port conflicts.
+**Symptom:** `docker ps` shows two sets of containers, port conflicts.
 
-**Cause:** A previous deployment used a different project name.
+**Cause:** A previous run used a different project name (`-p` flag).
 
 **Fix:**
 ```bash
@@ -536,25 +524,12 @@ docker compose -p a5project up --build --remove-orphans -d
 
 ---
 
-### Proxy points to wrong port
-
-**Symptom:** Public URLs return connection refused or 502, but containers are running.
-
-**Cause:** The server-side proxy configuration maps the public domain to the wrong host port.
-
-**Verify:**
-- `alejeg-finalfront.proxy.itcollege.ee` must proxy to `<server-ip>:98`
-- `alejeg-a5back.proxy.itcollege.ee` must proxy to `<server-ip>:99`
-
-Check with: `docker ps` — look for `0.0.0.0:98->80/tcp` and `0.0.0.0:99->8080/tcp`.
-
----
-
 ### Database volume is empty (missing seed data)
 
 **Symptom:** Login fails with "user not found"; no roles or workshops exist.
 
-**Cause:** Volume was deleted or `DataInitialization` flags in `appsettings.json` are set to `false`.
+**Cause:** Volume was deleted, or `DataInitialization` flags in `appsettings.json`
+are set to `false`.
 
 **Check `WebApp/appsettings.json`:**
 ```json
@@ -565,13 +540,15 @@ Check with: `docker ps` — look for `0.0.0.0:98->80/tcp` and `0.0.0.0:99->8080/
 }
 ```
 
-Seed identities and reference data (roles, a couple of demo workshops, services, and spare parts) are created by `WebApp/Program.cs` on startup when these flags are enabled. This project's public deployment has working seeded accounts; they are intentionally not listed here — do not assume a fixed set of credentials, and rotate/replace them before treating this configuration as a template for a real deployment.
+When these flags are enabled, `WebApp/Program.cs` seeds roles, reference data
+(workshops, services, spare parts), and three test login accounts on startup — see
+the root [README](../README.md#running-locally) for the seeded credentials.
 
 ---
 
 ### Swagger not accessible
 
-**Symptom:** `https://alejeg-a5back.proxy.itcollege.ee/swagger` returns 404 or timeout.
+**Symptom:** `http://localhost:99/swagger` returns 404 or timeout.
 
 **Cause:** Backend container is not running or crashed on startup.
 
@@ -585,40 +562,18 @@ Swagger is enabled in all environments (not gated by `IsDevelopment()`).
 
 ---
 
-### Frontend loads but login always fails
+### Login always fails
 
-**Symptom:** POST to `/api/v1/identity/account/login` returns 404, 500, or the request never reaches the backend.
+**Symptom:** POST to `/api/v1/identity/account/login` returns 404, 500, or the
+request never reaches the backend.
 
-**Cause 1:** `VITE_API_BASE_URL` is wrong — check Network tab (see above).
+**Cause 1:** `VITE_API_BASE_URL` is wrong — check the Network tab (see above).
 
-**Cause 2:** JWT configuration missing or default placeholder used. Check `WebApp/appsettings.json`:
-```json
-"JWT": {
-  "Key": "...",
-  "Issuer": "carservicetrack.ee",
-  "Audience": "carservicetrack.ee"
-}
-```
+**Cause 2:** JWT configuration missing. Check `JWT__Key` is set (see
+[Environment Variables](#environment-variables) — `docker-compose.yml` sets a
+working local default, but a standalone `dotnet run` outside Docker needs it set
+via `dotnet user-secrets` or an environment variable).
 
-**Cause 3:** The backend `RequireHttpsMetadata = true` in `Program.cs` — test client must use HTTPS. In production this is correct; in local testing use HTTPS or override the setting.
-
----
-
-## Final Deployment Summary
-
-| Item | Value |
-|---|---|
-| Frontend | https://alejeg-finalfront.proxy.itcollege.ee |
-| Backend API | https://alejeg-a5back.proxy.itcollege.ee |
-| Swagger | https://alejeg-a5back.proxy.itcollege.ee/swagger |
-| Frontend port | 98:80 |
-| Backend port | 99:8080 |
-| Compose project | a5project |
-| Database service | db |
-| Database volume | a5_pgdata |
-| Backend environment | Production |
-| Production CORS | https://alejeg-finalfront.proxy.itcollege.ee |
-| CI/CD | GitLab CI — stages: test → deploy |
-| Unit tests | 114 passed |
-| Integration tests | 74 passed |
-| Architecture tests | 15 passed |
+**Cause 3:** The backend has `RequireHttpsMetadata` from `JWT:RequireHttpsMetadata`
+in config. This only matters if an external `Authority` is configured (it isn't, by
+default) — the symmetric-key JWT validation used here doesn't require HTTPS.
